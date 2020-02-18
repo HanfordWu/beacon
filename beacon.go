@@ -8,15 +8,34 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/google/gopacket/pcap"
 )
 
 const (
         ipHeaderLen = 20
-        icmpHeaderLen = 8
+		icmpHeaderLen = 8
+		eth0DeviceName = "eth0"
 )
 
 func main() {
-	sourceIP := net.IPv4(10, 20, 30, 96)
+	devices, err := pcap.FindAllDevs()
+	if err != nil {
+		log.Fatalf("Failed to get device information from the host: %s", err)
+	}
+
+	var eth0Device pcap.Interface
+	deviceFound := false
+	for _, device := range devices {
+		if device.Name == eth0DeviceName && len(device.Addresses) > 0 {
+			deviceFound = true
+			eth0Device = device
+		}
+	}
+	if !deviceFound {
+		log.Fatalf("Couldn't find a device named %s, or it did not have any addresses assigned to it", eth0DeviceName)
+	}
+
+	sourceIP := eth0Device.Addresses[0].IP
 	destIP := net.IPv4(104, 44, 227, 112)
 	
 	payload := []byte{'H', 'e', 'l', 'l', 'o'}
@@ -56,7 +75,7 @@ func main() {
 		Seq:      1,
 	}
 
-	err := gopacket.SerializeLayers(buf, opts,
+	err = gopacket.SerializeLayers(buf, opts,
 		ipipLayer,
 		ipLayer,
 		icmpLayer,
@@ -69,7 +88,7 @@ func main() {
 
 	err = sendPacket(packetData, destIP)
 	if err != nil {
-		log.Fatal("Failed to call send packet: ", err)
+		log.Fatalf("sendPacket failed with error: %s", err)
 	}
 	log.Printf("Successfully sent a packet: %v\n", packetData)
 }
