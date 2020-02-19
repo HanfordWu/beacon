@@ -1,10 +1,8 @@
 package main
 
 import (
-	"errors"
 	"log"
 	"net"
-	"syscall"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -38,13 +36,13 @@ func main() {
 	sourceIP := eth0Device.Addresses[0].IP
 	destIP := net.IPv4(104, 44, 227, 112)
 
-	handle, err := pcap.OpenLive(eth0DeviceName, 1600, true, pcap.BlockForever)
+	tc, err := NewTransportChannel()
 	if err != nil {
-		log.Fatalf("Error opening packet capture handle: %s", err)
+		log.Fatalf("Failed to create new TransportChannel: %s", err)
 	}
-	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
+
 	go func() {
-		for packet := range packetSource.Packets() {
+		for packet := range tc.Rx() {
 			handlePacket(packet)
 		}
 	}()
@@ -81,7 +79,7 @@ func main() {
 	}
 	packetData := buf.Bytes()
 
-	err = sendPacket(packetData, destIP)
+	err = tc.SendTo(packetData, destIP)
 	if err != nil {
 		log.Fatalf("sendPacket failed with error: %s", err)
 	}
@@ -89,26 +87,6 @@ func main() {
 
 	done := make(chan bool)
 	<- done
-}
-
-func sendPacket(packetData []byte, dest net.IP) error {
-	// open a raw socket, the IPPROTO_RAW protocol implies IP_HDRINCL is enabled
-	// http://man7.org/linux/man-pages/man7/raw.7.html
-	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
-	if err != nil {
-		return err
-	}
-	defer syscall.Close(fd)
-
-	dest = dest.To4()
-	if dest == nil {
-		return errors.New("dest IP must be an ipv4 address")
-	}
-
-	addr := syscall.SockaddrInet4{
-		Addr: [4]byte{dest[0], dest[1], dest[2], dest[3]},
-	}
-	return syscall.Sendto(fd, packetData, 0, &addr)
 }
 
 func handlePacket(p gopacket.Packet) {
