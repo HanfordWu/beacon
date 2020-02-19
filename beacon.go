@@ -46,28 +46,12 @@ func main() {
 	}
 
 	// outer ip in ip header (layer 3) https://tools.ietf.org/html/rfc2003#section-3
-	ipipLayer := &layers.IPv4{
-		Version:  4,
-		IHL:      5,
-		Length:   uint16(ipHeaderLen + ipHeaderLen + icmpHeaderLen + len(payload)),
-		Flags:    layers.IPv4DontFragment,
-		TTL:      64,
-		Protocol: layers.IPProtocolIPv4,
-		SrcIP:    sourceIP,
-		DstIP:    destIP,
-	}
+	ipipLength := uint16(ipHeaderLen + ipHeaderLen + icmpHeaderLen + len(payload))
+	ipipLayer := buildIPIPLayer(sourceIP, destIP, ipipLength)
 
 	// inner ip header (layer 3) https://tools.ietf.org/html/rfc791#section-3.1
-	ipLayer := &layers.IPv4{
-		Version:  4,
-		IHL:      5,
-		Length:   uint16(ipHeaderLen + icmpHeaderLen + len(payload)),
-		Flags:    layers.IPv4DontFragment,
-		TTL:      64,
-		Protocol: layers.IPProtocolICMPv4,
-		SrcIP:    destIP,
-		DstIP:    sourceIP,
-	}
+	ipLength := uint16(ipHeaderLen + icmpHeaderLen + len(payload))
+	ipLayer := buildIPv4ICMPLayer(sourceIP, destIP, ipLength, 64)
 
 	// inner icmp header (layer 4) https://tools.ietf.org/html/rfc792#page-4
 	icmpLayer := &layers.ICMPv4{
