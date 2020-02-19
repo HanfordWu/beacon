@@ -29,8 +29,8 @@ func buildIPv4ICMPLayer(sourceIP, destIP net.IP, totalLength uint16, ttl uint8) 
 		Flags:    layers.IPv4DontFragment,
 		TTL:      ttl,
 		Protocol: layers.IPProtocolICMPv4,
-		SrcIP:    destIP,
-		DstIP:    sourceIP,
+		SrcIP:    sourceIP,
+		DstIP:    destIP,
 	}
 
 	return ipLayer
