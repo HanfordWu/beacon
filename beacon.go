@@ -37,6 +37,17 @@ func main() {
 
 	sourceIP := eth0Device.Addresses[0].IP
 	destIP := net.IPv4(104, 44, 227, 112)
+
+	handle, err := pcap.OpenLive(eth0DeviceName, 1600, true, pcap.BlockForever)
+	if err != nil {
+		log.Fatalf("Error opening packet capture handle: %s", err)
+	}
+	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
+	go func() {
+		for packet := range packetSource.Packets() {
+			handlePacket(packet)
+		}
+	}()
 	
 	payload := []byte{'H', 'e', 'l', 'l', 'o'}
 
@@ -75,6 +86,9 @@ func main() {
 		log.Fatalf("sendPacket failed with error: %s", err)
 	}
 	log.Printf("Successfully sent a packet: %v\n", packetData)
+
+	done := make(chan bool)
+	<- done
 }
 
 func sendPacket(packetData []byte, dest net.IP) error {
@@ -95,4 +109,16 @@ func sendPacket(packetData []byte, dest net.IP) error {
 		Addr: [4]byte{dest[0], dest[1], dest[2], dest[3]},
 	}
 	return syscall.Sendto(fd, packetData, 0, &addr)
+}
+
+func handlePacket(p gopacket.Packet) {
+	icmpLayer := p.Layer(layers.LayerTypeICMPv4)
+	if icmpLayer == nil {
+		return
+	}
+	ipv4Layer := p.Layer(layers.LayerTypeIPv4)
+
+	icmp, _ := icmpLayer.(*layers.ICMPv4)
+	ip4, _ := ipv4Layer.(*layers.IPv4)
+	log.Printf("%s -> %s  %s", ip4.SrcIP, ip4.DstIP, icmp.TypeCode)
 }
