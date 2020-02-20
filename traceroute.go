@@ -11,7 +11,7 @@ import (
 
 // Traceroute performs traditional traceroute
 func Traceroute(destAddr net.IP, tc TransportChannel) error {
-	log.Println("Doing traceroute")
+	log.Printf("Doing traceroute to %s", destAddr)
 	done := make(chan error)
 	found := make(chan uint8)
 

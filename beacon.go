@@ -29,4 +29,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("Traceroute failed: %s", err)
 	}
+
+	err = ReverseTraceroute(destIP, *tc)
+	if err != nil {
+		log.Fatalf("ReverseTraceroute failed: %s", err)
+	}
 }
