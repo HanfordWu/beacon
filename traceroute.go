@@ -46,10 +46,10 @@ func Traceroute(destAddr net.IP, tc TransportChannel) error {
 			} else if icmp.TypeCode == icmpEchoReply {
 				if ip4.DstIP.Equal(sourceIP) && ip4.SrcIP.Equal(destAddr) {
 					// log.Printf("%s -> %s  %s", ip4.SrcIP, ip4.DstIP, icmp.TypeCode)
-				    hostname, err := net.LookupAddr(ip4.SrcIP.String())
-				    if err != nil {
+					hostname, err := net.LookupAddr(ip4.SrcIP.String())
+					if err != nil {
 						log.Println(ip4.SrcIP)
-				    } else {
+					} else {
 						log.Printf("%s", hostname)
 					}
 					found <- ip4.TTL
@@ -60,43 +60,43 @@ func Traceroute(destAddr net.IP, tc TransportChannel) error {
 	}()
 
 	go func() {
-    	for ttl := 0; ttl <= 32; ttl++ {
-    	    payload := []byte{'H', 'e', 'l', 'l', 'o'}
-    
-    	    buf := gopacket.NewSerializeBuffer()
-    	    opts := gopacket.SerializeOptions{
-    	    	ComputeChecksums: true,
-    	    }
-    
-    	    // inner ip header (layer 3) https://tools.ietf.org/html/rfc791#section-3.1
-    	    ipLength := uint16(ipHeaderLen + icmpHeaderLen + len(payload))
-    	    ipLayer := buildIPv4ICMPLayer(sourceIP, destAddr, ipLength, uint8(ttl))
-    
-    	    // inner icmp header (layer 4) https://tools.ietf.org/html/rfc792#page-4
-    	    icmpLayer := &layers.ICMPv4{
-    	    	TypeCode: layers.CreateICMPv4TypeCode(layers.ICMPv4TypeEchoRequest, 0),
-    	    	Seq:      1,
-    	    }
-    
-    	    err = gopacket.SerializeLayers(buf, opts,
-    	    	ipLayer,
-    	    	icmpLayer,
-                gopacket.Payload(payload),
-    	    )
-    	    if err != nil {
+		for ttl := 0; ttl <= 32; ttl++ {
+			payload := []byte{'H', 'e', 'l', 'l', 'o'}
+
+			buf := gopacket.NewSerializeBuffer()
+			opts := gopacket.SerializeOptions{
+				ComputeChecksums: true,
+			}
+
+			// inner ip header (layer 3) https://tools.ietf.org/html/rfc791#section-3.1
+			ipLength := uint16(ipHeaderLen + icmpHeaderLen + len(payload))
+			ipLayer := buildIPv4ICMPLayer(sourceIP, destAddr, ipLength, uint8(ttl))
+
+			// inner icmp header (layer 4) https://tools.ietf.org/html/rfc792#page-4
+			icmpLayer := &layers.ICMPv4{
+				TypeCode: layers.CreateICMPv4TypeCode(layers.ICMPv4TypeEchoRequest, 0),
+				Seq:      1,
+			}
+
+			err = gopacket.SerializeLayers(buf, opts,
+				ipLayer,
+				icmpLayer,
+				gopacket.Payload(payload),
+			)
+			if err != nil {
 				done <- err
-    	    }
-    	    packetData := buf.Bytes()
-    
-    	    err = tc.SendTo(packetData, destAddr)
-    	    if err != nil {
-    			done <- err
-    		}
-    
-    		<- found
-    	}
+			}
+			packetData := buf.Bytes()
+
+			err = tc.SendTo(packetData, destAddr)
+			if err != nil {
+				done <- err
+			}
+
+			<-found
+		}
 	}()
 
-	err = <- done
+	err = <-done
 	return err
 }

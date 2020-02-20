@@ -57,68 +57,68 @@ func ReverseTraceroute(destAddr net.IP, tc TransportChannel) error {
 	}()
 
 	go func() {
-    	for ttl := 0; ttl <= 64; ttl++ {
-    	    payload := []byte{'H', 'e', 'l', 'l', 'o'}
-    
+		for ttl := 0; ttl <= 64; ttl++ {
+			payload := []byte{'H', 'e', 'l', 'l', 'o'}
+
 			roundTripBuf := gopacket.NewSerializeBuffer()
 			farendBuf := gopacket.NewSerializeBuffer()
-    	    opts := gopacket.SerializeOptions{
-    	    	ComputeChecksums: true,
+			opts := gopacket.SerializeOptions{
+				ComputeChecksums: true,
 			}
 
 			// outer ip in ip header (layer 3) https://tools.ietf.org/html/rfc2003#section-3
-    	    ipipLength := uint16(ipHeaderLen + ipHeaderLen + icmpHeaderLen + len(payload))
-    	    ipipLayer := buildIPIPLayer(sourceIP, destAddr, ipipLength)
-    
-    	    // inner ip header (layer 3) https://tools.ietf.org/html/rfc791#section-3.1
-    	    ipLength := uint16(ipHeaderLen + icmpHeaderLen + len(payload))
+			ipipLength := uint16(ipHeaderLen + ipHeaderLen + icmpHeaderLen + len(payload))
+			ipipLayer := buildIPIPLayer(sourceIP, destAddr, ipipLength)
+
+			// inner ip header (layer 3) https://tools.ietf.org/html/rfc791#section-3.1
+			ipLength := uint16(ipHeaderLen + icmpHeaderLen + len(payload))
 			roundTripIPLayer := buildIPv4ICMPLayer(sourceIP, sourceIP, ipLength, uint8(ttl))
 
-    	    farendIPLayer := buildIPv4ICMPLayer(destAddr, sourceIP, ipLength, uint8(ttl + 1))
-    
-    	    // inner icmp header (layer 4) https://tools.ietf.org/html/rfc792#page-4
-    	    icmpLayer := &layers.ICMPv4{
-    	    	TypeCode: layers.CreateICMPv4TypeCode(layers.ICMPv4TypeEchoRequest, 0),
-    	    	Seq:      1,
-    	    }
-    
+			farendIPLayer := buildIPv4ICMPLayer(destAddr, sourceIP, ipLength, uint8(ttl+1))
+
+			// inner icmp header (layer 4) https://tools.ietf.org/html/rfc792#page-4
+			icmpLayer := &layers.ICMPv4{
+				TypeCode: layers.CreateICMPv4TypeCode(layers.ICMPv4TypeEchoRequest, 0),
+				Seq:      1,
+			}
+
 			err = gopacket.SerializeLayers(roundTripBuf, opts,
 				ipipLayer,
-    	    	roundTripIPLayer,
-    	    	icmpLayer,
-                gopacket.Payload(payload),
-    	    )
-    	    if err != nil {
+				roundTripIPLayer,
+				icmpLayer,
+				gopacket.Payload(payload),
+			)
+			if err != nil {
 				done <- err
-    	    }
+			}
 			roundTripPacketData := roundTripBuf.Bytes()
 
 			err = gopacket.SerializeLayers(farendBuf, opts,
 				ipipLayer,
-    	    	farendIPLayer,
-    	    	icmpLayer,
-                gopacket.Payload(payload),
-    	    )
-    	    if err != nil {
+				farendIPLayer,
+				icmpLayer,
+				gopacket.Payload(payload),
+			)
+			if err != nil {
 				done <- err
-    	    }
-    	    farEndPacketData := farendBuf.Bytes()
-    
-    	    err = tc.SendTo(roundTripPacketData, destAddr)
-    	    if err != nil {
-    			done <- err
+			}
+			farEndPacketData := farendBuf.Bytes()
+
+			err = tc.SendTo(roundTripPacketData, destAddr)
+			if err != nil {
+				done <- err
 			}
 
-    	    err = tc.SendTo(farEndPacketData, destAddr)
-    	    if err != nil {
-    			done <- err
-    		}
-    
-    		<- found
-    	}
+			err = tc.SendTo(farEndPacketData, destAddr)
+			if err != nil {
+				done <- err
+			}
+
+			<-found
+		}
 	}()
 
-	err = <- done
+	err = <-done
 	return err
 }
 
