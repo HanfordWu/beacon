@@ -35,11 +35,23 @@ func Traceroute(destAddr net.IP, tc TransportChannel) error {
 			ip4, _ := ipv4Layer.(*layers.IPv4)
 
 			if int(icmp.TypeCode) == icmpTTLExceeded && bytes.Equal(ip4.DstIP, sourceIP) {
-				log.Printf("%s -> %s  %s", ip4.SrcIP, ip4.DstIP, icmp.TypeCode)
+				// log.Printf("%s -> %s  %s", ip4.SrcIP, ip4.DstIP, icmp.TypeCode)
+				hostname, err := net.LookupAddr(ip4.SrcIP.String())
+				if err != nil {
+					log.Println(ip4.SrcIP)
+				} else {
+					log.Printf("%s", hostname)
+				}
 				found <- ip4.TTL
 			} else if icmp.TypeCode == icmpEchoReply {
 				if ip4.DstIP.Equal(sourceIP) && ip4.SrcIP.Equal(destAddr) {
-					log.Printf("%s -> %s  %s", ip4.SrcIP, ip4.DstIP, icmp.TypeCode)
+					// log.Printf("%s -> %s  %s", ip4.SrcIP, ip4.DstIP, icmp.TypeCode)
+				    hostname, err := net.LookupAddr(ip4.SrcIP.String())
+				    if err != nil {
+						log.Println(ip4.SrcIP)
+				    } else {
+						log.Printf("%s", hostname)
+					}
 					found <- ip4.TTL
 					done <- nil
 				}
