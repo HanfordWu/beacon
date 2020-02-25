@@ -7,7 +7,7 @@ import (
 	"github.com/google/gopacket/pcap"
 )
 
-func findSourceIP() (net.IP, error) {
+func findLocalIP() (net.IP, error) {
 	devices, err := pcap.FindAllDevs()
 	if err != nil {
 		return nil, err

@@ -10,12 +10,12 @@ import (
 )
 
 // Traceroute performs traditional traceroute
-func Traceroute(destAddr net.IP, tc TransportChannel) error {
-	log.Printf("Doing traceroute to %s", destAddr)
+func Traceroute(destIP net.IP, tc TransportChannel) error {
+	log.Printf("Doing traceroute to %s", destIP)
 	done := make(chan error)
 	found := make(chan uint8)
 
-	sourceIP, err := findSourceIP()
+	sourceIP, err := findLocalIP()
 	if err != nil {
 		return err
 	}
@@ -44,7 +44,7 @@ func Traceroute(destAddr net.IP, tc TransportChannel) error {
 				}
 				found <- ip4.TTL
 			} else if icmp.TypeCode == icmpEchoReply {
-				if ip4.DstIP.Equal(sourceIP) && ip4.SrcIP.Equal(destAddr) {
+				if ip4.DstIP.Equal(sourceIP) && ip4.SrcIP.Equal(destIP) {
 					// log.Printf("%s -> %s  %s", ip4.SrcIP, ip4.DstIP, icmp.TypeCode)
 					hostname, err := net.LookupAddr(ip4.SrcIP.String())
 					if err != nil {
@@ -70,7 +70,7 @@ func Traceroute(destAddr net.IP, tc TransportChannel) error {
 
 			// inner ip header (layer 3) https://tools.ietf.org/html/rfc791#section-3.1
 			ipLength := uint16(ipHeaderLen + icmpHeaderLen + len(payload))
-			ipLayer := buildIPv4ICMPLayer(sourceIP, destAddr, ipLength, uint8(ttl))
+			ipLayer := buildIPv4ICMPLayer(sourceIP, destIP, ipLength, uint8(ttl))
 
 			// inner icmp header (layer 4) https://tools.ietf.org/html/rfc792#page-4
 			icmpLayer := &layers.ICMPv4{
@@ -88,7 +88,7 @@ func Traceroute(destAddr net.IP, tc TransportChannel) error {
 			}
 			packetData := buf.Bytes()
 
-			err = tc.SendTo(packetData, destAddr)
+			err = tc.SendTo(packetData, destIP)
 			if err != nil {
 				done <- err
 			}

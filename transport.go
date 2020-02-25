@@ -12,19 +12,47 @@ import (
 // TransportChannel is a struct which facilitates packet tx/rx
 type TransportChannel struct {
 	packetSource *gopacket.PacketSource
+	deviceName   string
+	snaplen      int32
+	filter       string
+}
+
+// TransportChannelOption modifies a TransportChannel struct
+// The TransportChannel constructor accepts a variadic parameter
+// of TransportChannelOptions, each of which will be invoked upon construction
+type TransportChannelOption func(*TransportChannel)
+
+// WithBPFFilter constructs an option to set BPFFilter via the TransportChannel constructor
+func WithBPFFilter(filter string) TransportChannelOption {
+	return func(tc *TransportChannel) {
+		tc.filter = filter
+	}
 }
 
 // NewTransportChannel instantiates a new transport chanel
-func NewTransportChannel() (*TransportChannel, error) {
+func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, error) {
+	tc := &TransportChannel{
+		deviceName: eth0DeviceName,
+		snaplen:    1600,
+		filter:     "",
+	}
 
-	handle, err := pcap.OpenLive(eth0DeviceName, 1600, true, pcap.BlockForever)
+	for _, opt := range options {
+		opt(tc)
+	}
+
+	handle, err := pcap.OpenLive(tc.deviceName, tc.snaplen, true, pcap.BlockForever)
 	if err != nil {
 		return nil, err
 	}
 
-	tc := &TransportChannel{
-		packetSource: gopacket.NewPacketSource(handle, handle.LinkType()),
+	if tc.filter != "" {
+		err = handle.SetBPFFilter(tc.filter)
+		if err != nil {
+			return nil, err
+		}
 	}
+	tc.packetSource = gopacket.NewPacketSource(handle, handle.LinkType())
 
 	return tc, nil
 }

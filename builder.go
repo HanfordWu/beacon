@@ -3,6 +3,7 @@ package main
 import (
 	"net"
 
+	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 )
 
@@ -34,4 +35,56 @@ func buildIPv4ICMPLayer(sourceIP, destIP net.IP, totalLength uint16, ttl uint8) 
 	}
 
 	return ipLayer
+}
+
+func buildICMPTraceroutePacket(sourceIP, destIP net.IP, ttl uint8, payload []byte, buf gopacket.SerializeBuffer) error {
+	opts := gopacket.SerializeOptions{
+		ComputeChecksums: true,
+	}
+
+	ipLength := uint16(ipHeaderLen + icmpHeaderLen + len(payload))
+	ipLayer := buildIPv4ICMPLayer(sourceIP, destIP, ipLength, ttl)
+
+	icmpLayer := &layers.ICMPv4{
+		TypeCode: layers.CreateICMPv4TypeCode(layers.ICMPv4TypeEchoRequest, 0),
+		Seq:      1,
+	}
+
+	err := gopacket.SerializeLayers(buf, opts,
+		ipLayer,
+		icmpLayer,
+		gopacket.Payload(payload),
+	)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func buildEncapTraceroutePacket(outerSourceIP, outerDestIP, innerSourceIP, innerDestIP net.IP, ttl uint8, payload []byte, buf gopacket.SerializeBuffer) error {
+	opts := gopacket.SerializeOptions{
+		ComputeChecksums: true,
+	}
+
+	ipipLength := uint16(ipHeaderLen + ipHeaderLen + icmpHeaderLen + len(payload))
+	ipipLayer := buildIPIPLayer(outerSourceIP, outerDestIP, ipipLength)
+
+	ipLength := uint16(ipHeaderLen + icmpHeaderLen + len(payload))
+	ipLayer := buildIPv4ICMPLayer(innerSourceIP, innerDestIP, ipLength, ttl)
+
+	icmpLayer := &layers.ICMPv4{
+		TypeCode: layers.CreateICMPv4TypeCode(layers.ICMPv4TypeEchoRequest, 0),
+		Seq:      1,
+	}
+
+	err := gopacket.SerializeLayers(buf, opts,
+		ipipLayer,
+		ipLayer,
+		icmpLayer,
+		gopacket.Payload(payload),
+	)
+	if err != nil {
+		return err
+	}
+	return nil
 }
