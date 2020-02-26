@@ -150,21 +150,9 @@ func GetPathFromSourceToDest(sourceIP, destIP net.IP, tc TransportChannel) (Path
 		var ttl uint8
 		for ttl = 0; ttl <= 32; ttl++ {
 			buf := gopacket.NewSerializeBuffer()
-			opts := gopacket.SerializeOptions{
-				ComputeChecksums: true,
-			}
 			payload := []byte("Hello")
 
-			gopacket.SerializeLayers(buf, opts,
-				buildIPIPLayer(localIP, sourceIP, uint16((ipHeaderLen*2)+icmpHeaderLen+len(payload))),
-				// buildIPIPLayer(sourceIP, destIP, uint16((ipHeaderLen * 2) + icmpHeaderLen + len(payload))),
-				buildIPv4ICMPLayer(localIP, destIP, uint16(ipHeaderLen+icmpHeaderLen+len(payload)), ttl),
-				&layers.ICMPv4{
-					TypeCode: layers.CreateICMPv4TypeCode(layers.ICMPv4TypeEchoRequest, 0),
-					Seq:      1,
-				},
-				gopacket.Payload(payload),
-			)
+			buildEncapTraceroutePacket(localIP, sourceIP, localIP, destIP, ttl, payload, buf)
 
 			tc.SendTo(buf.Bytes(), sourceIP)
 			<-found
