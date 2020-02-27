@@ -3,6 +3,7 @@ package beacon
 const (
 	ipHeaderLen   = 20
 	icmpHeaderLen = 8
+	udpHeaderLen = 8
 
 	eth0DeviceName = "eth0"
 
