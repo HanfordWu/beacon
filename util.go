@@ -1,4 +1,4 @@
-package main
+package beacon
 
 import (
 	"log"
@@ -7,7 +7,8 @@ import (
 	"github.com/google/gopacket/pcap"
 )
 
-func findSourceIP() (net.IP, error) {
+// FindLocalIP finds the IP address assigned to the interface "eth0"
+func FindLocalIP() (net.IP, error) {
 	devices, err := pcap.FindAllDevs()
 	if err != nil {
 		return nil, err

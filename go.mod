@@ -1,4 +1,4 @@
-module beacon
+module github.com/trstruth/beacon
 
 go 1.13
 
