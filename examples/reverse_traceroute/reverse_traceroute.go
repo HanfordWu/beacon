@@ -25,7 +25,12 @@ func main() {
 
 // ReverseTraceroute uses IP in IP to perform traceroute from the remote back to the caller
 func ReverseTraceroute(destIP net.IP, tc beacon.TransportChannel) error {
-	fmt.Printf("Doing traceroute to %s", destIP)
+	destHostname, err := net.LookupAddr(destIP.String())
+	if err != nil {
+		fmt.Printf("Doing reverse traceroute from %s\n", destIP)
+	} else {
+		fmt.Printf("Doing reverse traceroute from %s (%s)\n", destHostname[0], destIP)
+	}
 
 	pc, err := beacon.GetPathChannelFrom(destIP, tc)
 	if err != nil {
@@ -35,9 +40,9 @@ func ReverseTraceroute(destIP net.IP, tc beacon.TransportChannel) error {
 	for hop := range pc {
 		hostname, err := net.LookupAddr(hop.String())
 		if err != nil {
-			fmt.Println(hostname)
-		} else {
 			fmt.Println(hop.String())
+		} else {
+			fmt.Println(hostname[0])
 		}
 	}
 
