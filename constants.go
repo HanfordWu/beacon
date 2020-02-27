@@ -1,4 +1,4 @@
-package main
+package beacon
 
 const (
 	ipHeaderLen   = 20
