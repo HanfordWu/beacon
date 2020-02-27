@@ -18,4 +18,5 @@
 cmd/beacon
 examples/traceroute/traceroute
 examples/reverse_traceroute/reverse_traceroute
+examples/spray/spray
 

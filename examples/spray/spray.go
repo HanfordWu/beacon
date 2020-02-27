@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -16,8 +17,9 @@ func main() {
 	}
 	destIP := net.ParseIP(os.Args[1])
 	path := []net.IP{sourceIP, destIP}
+	fmt.Printf("Starting spray over path %v\n", path)
 
-	tc, err := beacon.NewTransportChannel(beacon.WithBPFFilter("icmp"))
+	tc, err := beacon.NewTransportChannel()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -33,6 +35,7 @@ func spray(path beacon.Path, tc *beacon.TransportChannel) error {
 	if err != nil {
 		return err
 	}
+	fmt.Printf("sending packet: %v to path: %v\n", buf.Bytes(), path)
 
 	return tc.SendToPath(buf.Bytes(), path)
 }
