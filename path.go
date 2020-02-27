@@ -195,7 +195,7 @@ func GetPathChannelFromSourceToDest(sourceIP, destIP net.IP, tc TransportChannel
 			buildEncapTraceroutePacket(localIP, sourceIP, localIP, destIP, ttl, payload, buf)
 
 			tc.SendTo(buf.Bytes(), sourceIP)
-			
+
 			select {
 			case ip := <-found:
 				pathChan <- ip

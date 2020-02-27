@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
 	"net"
+	"os"
 
 	"github.com/trstruth/beacon"
 )
