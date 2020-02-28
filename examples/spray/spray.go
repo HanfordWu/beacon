@@ -12,13 +12,11 @@ import (
 
 func main() {
 	destIP := net.ParseIP(os.Args[1])
-	sourceIP, err := beacon.FindLocalIP()
+	tc, err := beacon.NewTransportChannel(beacon.WithBPFFilter("icmp"))
 	if err != nil {
 		log.Fatal(err)
 	}
-	path := []net.IP{sourceIP, destIP}
-
-	tc, err := beacon.NewTransportChannel()
+	path, err := beacon.GetPathTo(destIP, *tc)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -38,7 +36,7 @@ func spray(path beacon.Path, tc *beacon.TransportChannel) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("sending packet: %v to path: %v\n", buf.Bytes(), path)
+	fmt.Println("sending packet")
 
 	return tc.SendToPath(buf.Bytes(), path)
 }
