@@ -11,20 +11,23 @@ import (
 )
 
 func main() {
+	destIP := net.ParseIP(os.Args[1])
 	sourceIP, err := beacon.FindLocalIP()
 	if err != nil {
 		log.Fatal(err)
 	}
-	destIP := net.ParseIP(os.Args[1])
 	path := []net.IP{sourceIP, destIP}
-	fmt.Printf("Starting spray over path %v\n", path)
 
 	tc, err := beacon.NewTransportChannel()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	spray(path, tc)
+	fmt.Printf("Starting spray over path %v\n", path)
+	err = spray(path, tc)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func spray(path beacon.Path, tc *beacon.TransportChannel) error {

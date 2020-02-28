@@ -2,7 +2,6 @@ package beacon
 
 import (
 	"errors"
-	"fmt"
 	"net"
 
 	"github.com/google/gopacket"
@@ -41,14 +40,14 @@ func buildIPv4ICMPLayer(sourceIP, destIP net.IP, totalLength uint16, ttl uint8) 
 
 func buildUDPLayer(sourceIP, destIP net.IP, totalLength uint16) *layers.IPv4 {
 	ipLayer := &layers.IPv4{
-		Version: 4,
-		IHL: 5,
-		Length: totalLength,
-		Flags: layers.IPv4DontFragment,
-		TTL: 255,
+		Version:  4,
+		IHL:      5,
+		Length:   totalLength,
+		Flags:    layers.IPv4DontFragment,
+		TTL:      255,
 		Protocol: layers.IPProtocolUDP,
-		SrcIP: sourceIP,
-		DstIP: destIP,
+		SrcIP:    sourceIP,
+		DstIP:    destIP,
 	}
 
 	return ipLayer
@@ -126,26 +125,23 @@ func CreateRoundTripPacketForPath(path Path, payload []byte, buf gopacket.Serial
 		hopA := path[idx]
 		hopB := path[idx+1]
 
-		depLen := uint16(ipHeaderLen * (numLayers - idx) + lenOverhead)
-		arrLen := uint16(ipHeaderLen * (idx + 1) + lenOverhead)
+		depLen := uint16(ipHeaderLen*(numLayers-idx) + lenOverhead)
+		arrLen := uint16(ipHeaderLen*(idx+1) + lenOverhead)
 
 		constructedLayers[idx] = buildIPIPLayer(hopA, hopB, depLen)
-		constructedLayers[numLayers - idx - 1] = buildIPIPLayer(hopB, hopA, arrLen)
+		constructedLayers[numLayers-idx-1] = buildIPIPLayer(hopB, hopA, arrLen)
 	}
 
-	constructedLayers = append(constructedLayers, buildUDPLayer(path[1], path[0], uint16(ipHeaderLen + udpHeaderLen + len(payload))))
-	/*
-	constructedLayers = append(constructedLayers, &layers.UDP{
-		Length: uint16(udpHeaderLen + len(payload)),
-		SrcPort: 62003,
-		DstPort: 62002,
-	})
-	*/
+	ipLayer := buildUDPLayer(path[1], path[0], uint16(ipHeaderLen+udpHeaderLen+len(payload)))
+	constructedLayers[numLayers-1] = ipLayer
+	udpLayer := &layers.UDP{
+		SrcPort: 25199,
+		DstPort: 28525,
+		Length:  uint16(udpHeaderLen + len(payload)),
+	}
+	udpLayer.SetNetworkLayerForChecksum(ipLayer)
+	constructedLayers = append(constructedLayers, udpLayer)
 	constructedLayers = append(constructedLayers, gopacket.Payload(payload))
-
-	for _, layer := range constructedLayers {
-		fmt.Println(layer)
-	}
 
 	err := gopacket.SerializeLayers(buf, opts, constructedLayers...)
 	if err != nil {
@@ -153,4 +149,3 @@ func CreateRoundTripPacketForPath(path Path, payload []byte, buf gopacket.Serial
 	}
 	return nil
 }
-
