@@ -23,11 +23,10 @@ func buildIPIPLayer(sourceIP, destIP net.IP) *layers.IPv4 {
 	return ipipLayer
 }
 
-func buildIPv4ICMPLayer(sourceIP, destIP net.IP, totalLength uint16, ttl uint8) *layers.IPv4 {
+func buildIPv4ICMPLayer(sourceIP, destIP net.IP, ttl uint8) *layers.IPv4 {
 	ipLayer := &layers.IPv4{
 		Version:  4,
 		IHL:      5,
-		Length:   totalLength,
 		Flags:    layers.IPv4DontFragment,
 		TTL:      ttl,
 		Protocol: layers.IPProtocolICMPv4,
@@ -38,11 +37,10 @@ func buildIPv4ICMPLayer(sourceIP, destIP net.IP, totalLength uint16, ttl uint8) 
 	return ipLayer
 }
 
-func buildUDPLayer(sourceIP, destIP net.IP, totalLength uint16) *layers.IPv4 {
+func buildUDPLayer(sourceIP, destIP net.IP) *layers.IPv4 {
 	ipLayer := &layers.IPv4{
 		Version:  4,
 		IHL:      5,
-		Length:   totalLength,
 		Flags:    layers.IPv4DontFragment,
 		TTL:      255,
 		Protocol: layers.IPProtocolUDP,
@@ -59,8 +57,7 @@ func buildICMPTraceroutePacket(sourceIP, destIP net.IP, ttl uint8, payload []byt
 		FixLengths:       true,
 	}
 
-	ipLength := uint16(ipHeaderLen + icmpHeaderLen + len(payload))
-	ipLayer := buildIPv4ICMPLayer(sourceIP, destIP, ipLength, ttl)
+	ipLayer := buildIPv4ICMPLayer(sourceIP, destIP, ttl)
 
 	icmpLayer := &layers.ICMPv4{
 		TypeCode: layers.CreateICMPv4TypeCode(layers.ICMPv4TypeEchoRequest, 0),
@@ -85,9 +82,7 @@ func buildEncapTraceroutePacket(outerSourceIP, outerDestIP, innerSourceIP, inner
 	}
 
 	ipipLayer := buildIPIPLayer(outerSourceIP, outerDestIP)
-
-	ipLength := uint16(ipHeaderLen + icmpHeaderLen + len(payload))
-	ipLayer := buildIPv4ICMPLayer(innerSourceIP, innerDestIP, ipLength, ttl)
+	ipLayer := buildIPv4ICMPLayer(innerSourceIP, innerDestIP, ttl)
 
 	icmpLayer := &layers.ICMPv4{
 		TypeCode: layers.CreateICMPv4TypeCode(layers.ICMPv4TypeEchoRequest, 0),
