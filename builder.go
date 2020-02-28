@@ -2,17 +2,17 @@ package beacon
 
 import (
 	"errors"
+	"fmt"
 	"net"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 )
 
-func buildIPIPLayer(sourceIP, destIP net.IP, totalLength uint16) *layers.IPv4 {
+func buildIPIPLayer(sourceIP, destIP net.IP) *layers.IPv4 {
 	ipipLayer := &layers.IPv4{
 		Version:  4,
 		IHL:      5,
-		Length:   totalLength,
 		Flags:    layers.IPv4DontFragment,
 		TTL:      255,
 		Protocol: layers.IPProtocolIPv4,
@@ -56,6 +56,7 @@ func buildUDPLayer(sourceIP, destIP net.IP, totalLength uint16) *layers.IPv4 {
 func buildICMPTraceroutePacket(sourceIP, destIP net.IP, ttl uint8, payload []byte, buf gopacket.SerializeBuffer) error {
 	opts := gopacket.SerializeOptions{
 		ComputeChecksums: true,
+		FixLengths:       true,
 	}
 
 	ipLength := uint16(ipHeaderLen + icmpHeaderLen + len(payload))
@@ -80,10 +81,10 @@ func buildICMPTraceroutePacket(sourceIP, destIP net.IP, ttl uint8, payload []byt
 func buildEncapTraceroutePacket(outerSourceIP, outerDestIP, innerSourceIP, innerDestIP net.IP, ttl uint8, payload []byte, buf gopacket.SerializeBuffer) error {
 	opts := gopacket.SerializeOptions{
 		ComputeChecksums: true,
+		FixLengths:       true,
 	}
 
-	ipipLength := uint16(ipHeaderLen + ipHeaderLen + icmpHeaderLen + len(payload))
-	ipipLayer := buildIPIPLayer(outerSourceIP, outerDestIP, ipipLength)
+	ipipLayer := buildIPIPLayer(outerSourceIP, outerDestIP)
 
 	ipLength := uint16(ipHeaderLen + icmpHeaderLen + len(payload))
 	ipLayer := buildIPv4ICMPLayer(innerSourceIP, innerDestIP, ipLength, ttl)
@@ -109,6 +110,7 @@ func buildEncapTraceroutePacket(outerSourceIP, outerDestIP, innerSourceIP, inner
 func CreateRoundTripPacketForPath(path Path, payload []byte, buf gopacket.SerializeBuffer) error {
 	opts := gopacket.SerializeOptions{
 		ComputeChecksums: true,
+		FixLengths:       true,
 	}
 
 	if len(path) < 2 {
@@ -117,19 +119,14 @@ func CreateRoundTripPacketForPath(path Path, payload []byte, buf gopacket.Serial
 
 	numHops := len(path)
 	numLayers := 2 * (numHops - 1)
-	lenOverhead := len(payload) + udpHeaderLen + ipHeaderLen
-
 	constructedLayers := make([]gopacket.SerializableLayer, numLayers)
 
 	for idx := range path[:len(path)-1] {
 		hopA := path[idx]
 		hopB := path[idx+1]
 
-		depLen := uint16(ipHeaderLen*(numLayers-idx) + lenOverhead)
-		arrLen := uint16(ipHeaderLen*(idx+1) + lenOverhead)
-
-		constructedLayers[idx] = buildIPIPLayer(hopA, hopB, depLen)
-		constructedLayers[numLayers-idx-1] = buildIPIPLayer(hopB, hopA, arrLen)
+		constructedLayers[idx] = buildIPIPLayer(hopA, hopB)
+		constructedLayers[numLayers-idx-1] = buildIPIPLayer(hopB, hopA)
 	}
 
 	ipLayer := buildUDPLayer(path[1], path[0], uint16(ipHeaderLen+udpHeaderLen+len(payload)))
@@ -142,6 +139,10 @@ func CreateRoundTripPacketForPath(path Path, payload []byte, buf gopacket.Serial
 	udpLayer.SetNetworkLayerForChecksum(ipLayer)
 	constructedLayers = append(constructedLayers, udpLayer)
 	constructedLayers = append(constructedLayers, gopacket.Payload(payload))
+
+	for _, layer := range constructedLayers {
+		fmt.Println(layer)
+	}
 
 	err := gopacket.SerializeLayers(buf, opts, constructedLayers...)
 	if err != nil {
