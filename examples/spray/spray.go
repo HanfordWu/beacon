@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"github.com/trstruth/beacon"
 )
 
@@ -36,7 +37,28 @@ func spray(path beacon.Path, tc *beacon.TransportChannel) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("sending packet")
 
-	return tc.SendToPath(buf.Bytes(), path)
+	done := make(chan error)
+
+	go func() {
+		for packet := range tc.Rx() {
+			udpLayer := packet.Layer(layers.LayerTypeUDP)
+			ipv4Layer := packet.Layer(layers.LayerTypeIPv4)
+			udp, _ := udpLayer.(*layers.UDP)
+			ip4, _ := ipv4Layer.(*layers.IPv4)
+
+			if ip4.DstIP.Equal(path[0]) && ip4.SrcIP.Equal(path[1]) {
+				fmt.Printf("%s -> %s: %s\n", path[0], path[1], udp.Payload)
+				done <- nil
+			}
+		}
+	}()
+
+	fmt.Println("sending packet")
+	err = tc.SendToPath(buf.Bytes(), path)
+	if err != nil {
+		return err
+	}
+
+	return <-done
 }
