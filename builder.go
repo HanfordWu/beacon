@@ -124,8 +124,9 @@ func CreateRoundTripPacketForPath(path Path, payload []byte, buf gopacket.Serial
 		constructedLayers[numLayers-idx-1] = buildIPIPLayer(hopB, hopA)
 	}
 
-	ipLayer := buildUDPLayer(path[1], path[0], uint16(ipHeaderLen+udpHeaderLen+len(payload)))
-	constructedLayers[numLayers-1] = ipLayer
+	ipLayer := buildUDPLayer(path[1], path[0])
+	constructedLayers = append(constructedLayers, ipLayer)
+
 	udpLayer := &layers.UDP{
 		SrcPort: 25199,
 		DstPort: 28525,
