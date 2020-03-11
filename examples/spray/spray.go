@@ -12,21 +12,59 @@ import (
 )
 
 func main() {
-	destIP := net.ParseIP(os.Args[1])
+	srcIP := net.ParseIP(os.Args[1])
+	destIP := net.ParseIP(os.Args[2])
 	tc, err := beacon.NewTransportChannel(beacon.WithBPFFilter("icmp"))
 	if err != nil {
 		log.Fatal(err)
 	}
-	path, err := beacon.GetPathTo(destIP, *tc)
+	pathChan, err := beacon.GetPathChannelFromSourceToDest(srcIP, destIP, *tc)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for hop := range pathChan {
+		hostname, err := net.LookupAddr(hop.String())
+		if err != nil {
+			fmt.Println(hop.String())
+		} else {
+			fmt.Println(hostname[0])
+		}
+	}
+	fmt.Println("DONE")
+
+	path, err := beacon.GetPathFromSourceToDest(srcIP, destIP, *tc)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("Starting spray over path %v\n", path)
-	err = spray(path, tc)
+	vantageIP, err := beacon.FindLocalIP()
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	path = append([]net.IP{vantageIP}, path...)
+
+	// sprayTc, err := beacon.NewTransportChannel(beacon.WithBPFFilter("ip proto 4"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// path = []net.IP{net.IP{10, 20, 30, 96}, net.IP{104,44,0,230}}
+	fmt.Printf("Starting spray over path %v\n", path)
+	for _, hop := range path {
+		hostname, err := net.LookupAddr(hop.String())
+		if err != nil {
+			fmt.Println(hop.String())
+		} else {
+			fmt.Println(hostname[0])
+		}
+	}
+	/*
+	err = spray(path, sprayTc)
+	if err != nil {
+		log.Fatal(err)
+	}
+	*/
 }
 
 func spray(path beacon.Path, tc *beacon.TransportChannel) error {
@@ -48,7 +86,7 @@ func spray(path beacon.Path, tc *beacon.TransportChannel) error {
 			ip4, _ := ipv4Layer.(*layers.IPv4)
 
 			if ip4.DstIP.Equal(path[0]) && ip4.SrcIP.Equal(path[1]) {
-				fmt.Printf("%s -> %s: %s\n", path[0], path[1], udp.Payload)
+				fmt.Printf("%s -> %s: %s\n", path[1], path[0], udp.Payload)
 				done <- nil
 			}
 		}
