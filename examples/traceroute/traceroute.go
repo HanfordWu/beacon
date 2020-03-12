@@ -12,19 +12,14 @@ import (
 func main() {
 	destIP := net.ParseIP(os.Args[1])
 
-	tc, err := beacon.NewTransportChannel(beacon.WithBPFFilter("icmp"))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = Traceroute(destIP, *tc)
+	err := Traceroute(destIP)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
 // Traceroute performs traditional traceroute
-func Traceroute(destIP net.IP, tc beacon.TransportChannel) error {
+func Traceroute(destIP net.IP) error {
 	destHostname, err := net.LookupAddr(destIP.String())
 	if err != nil {
 		fmt.Printf("Doing traceroute to %s\n", destIP)
@@ -32,7 +27,7 @@ func Traceroute(destIP net.IP, tc beacon.TransportChannel) error {
 		fmt.Printf("Doing traceroute to %s (%s)\n", destHostname[0], destIP)
 	}
 
-	pc, err := beacon.GetPathChannelTo(destIP, tc)
+	pc, err := beacon.GetPathChannelTo(destIP)
 	if err != nil {
 		return err
 	}

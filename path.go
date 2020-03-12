@@ -14,10 +14,10 @@ type Path []net.IP
 type PathChannel chan net.IP
 
 // GetPathTo returns a Path to a destination IP from the caller
-func GetPathTo(destIP net.IP, tc TransportChannel) (Path, error) {
+func GetPathTo(destIP net.IP) (Path, error) {
 	path := make([]net.IP, 0)
 
-	pc, err := GetPathChannelTo(destIP, tc)
+	pc, err := GetPathChannelTo(destIP)
 	if err != nil {
 		return path, err
 	}
@@ -30,10 +30,10 @@ func GetPathTo(destIP net.IP, tc TransportChannel) (Path, error) {
 }
 
 // GetPathFrom returns a Path from a destination IP back to the caller
-func GetPathFrom(destIP net.IP, tc TransportChannel) (Path, error) {
+func GetPathFrom(destIP net.IP) (Path, error) {
 	path := make([]net.IP, 0)
 
-	pc, err := GetPathChannelFrom(destIP, tc)
+	pc, err := GetPathChannelFrom(destIP)
 	if err != nil {
 		return path, err
 	}
@@ -46,10 +46,10 @@ func GetPathFrom(destIP net.IP, tc TransportChannel) (Path, error) {
 }
 
 // GetPathFromSourceToDest returns a Path from a sourceIP to a destIP
-func GetPathFromSourceToDest(sourceIP, destIP net.IP, tc TransportChannel) (Path, error) {
+func GetPathFromSourceToDest(sourceIP, destIP net.IP) (Path, error) {
 	path := make([]net.IP, 0)
 
-	pc, err := GetPathChannelFromSourceToDest(sourceIP, destIP, tc)
+	pc, err := GetPathChannelFromSourceToDest(sourceIP, destIP)
 	if err != nil {
 		return path, err
 	}
@@ -62,7 +62,11 @@ func GetPathFromSourceToDest(sourceIP, destIP net.IP, tc TransportChannel) (Path
 }
 
 // GetPathChannelTo returns a PathChannel to a destination IP from the caller
-func GetPathChannelTo(destIP net.IP, tc TransportChannel) (PathChannel, error) {
+func GetPathChannelTo(destIP net.IP) (PathChannel, error) {
+	tc, err := NewTransportChannel(WithBPFFilter("icmp"))
+	if err != nil {
+		return nil, err
+	}
 
 	pathChan := make(PathChannel)
 	found := make(chan net.IP)
@@ -115,7 +119,12 @@ func GetPathChannelTo(destIP net.IP, tc TransportChannel) (PathChannel, error) {
 }
 
 // GetPathChannelFrom returns a PathChannel from a destination IP back to the caller
-func GetPathChannelFrom(destIP net.IP, tc TransportChannel) (PathChannel, error) {
+func GetPathChannelFrom(destIP net.IP) (PathChannel, error) {
+	tc, err := NewTransportChannel(WithBPFFilter("icmp"))
+	if err != nil {
+		return nil, err
+	}
+
 	pathChan := make(PathChannel)
 	found := make(chan net.IP)
 	done := make(chan error)
@@ -175,7 +184,12 @@ func GetPathChannelFrom(destIP net.IP, tc TransportChannel) (PathChannel, error)
 }
 
 // GetPathChannelFromSourceToDest returns a PathChannel from a sourceIP to a destIP
-func GetPathChannelFromSourceToDest(sourceIP, destIP net.IP, tc TransportChannel) (PathChannel, error) {
+func GetPathChannelFromSourceToDest(sourceIP, destIP net.IP) (PathChannel, error) {
+	tc, err := NewTransportChannel(WithBPFFilter("icmp"))
+	if err != nil {
+		return nil, err
+	}
+
 	pathChan := make(PathChannel)
 	found := make(chan net.IP)
 	done := make(chan error)
