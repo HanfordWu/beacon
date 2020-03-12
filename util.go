@@ -28,3 +28,19 @@ func FindLocalIP() (net.IP, error) {
 
 	return eth0Device.Addresses[0].IP, nil
 }
+
+// ParseIPFromString attempts to parse a valid IP address from the supplied string
+// the string can be in the x.x.x.x format or a hostname.
+func ParseIPFromString(s string) (net.IP, error) {
+	ip := net.ParseIP(s)
+	if ip != nil {
+		return ip, nil
+	}
+
+	ipAddrs, err := net.LookupIP(s)
+	if err != nil {
+		return nil, err
+	}
+
+	return ipAddrs[0], nil
+}
