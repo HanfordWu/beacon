@@ -44,6 +44,7 @@ func sprayRun(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	fmt.Printf("Finding path from %s to %s\n", srcIP, destIP)
 	path, err := beacon.GetPathFromSourceToDest(srcIP, destIP)
 	if err != nil {
 		return err
@@ -57,6 +58,8 @@ func sprayRun(cmd *cobra.Command, args []string) error {
 		}
 		path = append([]net.IP{vantageIP}, path...)
 	}
+	// path = []net.IP{net.IP{10, 20, 30, 96}, net.IP{207, 46, 35, 118}, net.IP{104, 44, 18, 117}}
+	fmt.Printf("%v\n", path)
 
 	tc, err := beacon.NewTransportChannel(beacon.WithBPFFilter("ip proto 4"))
 	if err != nil {
