@@ -17,6 +17,11 @@ var RootCmd = &cobra.Command{
 	Version: "v0.1.0",
 }
 
+func initRoot() {
+	RootCmd.Flags().BoolVarP(&reverse, "reverse", "r", false, "trace the route in reverse from target back to caller")
+	RootCmd.AddCommand(SprayCmd)
+}
+
 func rootRun(cmd *cobra.Command, args []string) error {
 	destIP, err := beacon.ParseIPFromString(args[0])
 	if err != nil {
