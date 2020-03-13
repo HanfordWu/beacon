@@ -198,6 +198,9 @@ func GetPathChannelFromSourceToDest(sourceIP, destIP net.IP) (PathChannel, error
 	if err != nil {
 		return pathChan, err
 	}
+	if sourceIP.Equal(localIP) {
+		return GetPathChannelTo(destIP)
+	}
 
 	go func() {
 		defer close(pathChan)
