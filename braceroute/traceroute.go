@@ -2,21 +2,10 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net"
-	"os"
 
 	"github.com/trstruth/beacon"
 )
-
-func main() {
-	destIP := net.ParseIP(os.Args[1])
-
-	err := Traceroute(destIP)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
 
 // Traceroute performs traditional traceroute
 func Traceroute(destIP net.IP) error {
@@ -37,7 +26,7 @@ func Traceroute(destIP net.IP) error {
 		if err != nil {
 			fmt.Println(hop.String())
 		} else {
-			fmt.Println(hostname[0])
+			fmt.Printf("%s (%s)\n", hostname[0], hop.String())
 		}
 	}
 

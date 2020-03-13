@@ -2,21 +2,10 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net"
-	"os"
 
 	"github.com/trstruth/beacon"
 )
-
-func main() {
-	destIP := net.ParseIP(os.Args[1])
-
-	err := ReverseTraceroute(destIP)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
 
 // ReverseTraceroute uses IP in IP to perform traceroute from the remote back to the caller
 func ReverseTraceroute(destIP net.IP) error {
@@ -37,7 +26,7 @@ func ReverseTraceroute(destIP net.IP) error {
 		if err != nil {
 			fmt.Println(hop.String())
 		} else {
-			fmt.Println(hostname[0])
+			fmt.Printf("%s (%s)\n", hostname[0], hop.String())
 		}
 	}
 

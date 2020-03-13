@@ -82,3 +82,11 @@ func (tc *TransportChannel) SendTo(packetData []byte, destAddr net.IP) error {
 	}
 	return syscall.Sendto(fd, packetData, 0, &addr)
 }
+
+// SendToPath sends a packet to the first hop in the specified path
+func (tc *TransportChannel) SendToPath(packetData []byte, path Path) error {
+	if len(path) < 1 {
+		return errors.New("path must be non-empty")
+	}
+	return tc.SendTo(packetData, path[1])
+}
