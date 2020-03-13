@@ -16,10 +16,10 @@ var dest string
 // SprayCmd represents the spray subcommand which allows a user to send
 // a spray of packets over a path from source to dest
 var SprayCmd = &cobra.Command{
-	Use: "spray",
+	Use:   "spray",
 	Short: "spray packets over a path",
-	Long: "longer description for spraying packets over a path",
-	RunE: sprayRun,
+	Long:  "longer description for spraying packets over a path",
+	RunE:  sprayRun,
 }
 
 func sprayRun(cmd *cobra.Command, args []string) error {
