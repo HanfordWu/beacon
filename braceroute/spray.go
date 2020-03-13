@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -12,6 +13,8 @@ import (
 
 var source string
 var dest string
+var timeout int
+var numPackets int
 
 // SprayCmd represents the spray subcommand which allows a user to send
 // a spray of packets over a path from source to dest
@@ -72,7 +75,7 @@ func spray(path beacon.Path, tc *beacon.TransportChannel) error {
 		return err
 	}
 
-	done := make(chan error)
+	seen := make(chan []byte)
 
 	go func() {
 		for packet := range tc.Rx() {
@@ -82,17 +85,34 @@ func spray(path beacon.Path, tc *beacon.TransportChannel) error {
 			ip4, _ := ipv4Layer.(*layers.IPv4)
 
 			if ip4.DstIP.Equal(path[0]) && ip4.SrcIP.Equal(path[1]) {
-				fmt.Printf("%s -> %s: %s\n", path[1], path[0], udp.Payload)
-				done <- nil
+				// fmt.Printf("%s -> %s: %s\n", path[1], path[0], udp.Payload)
+				seen <- udp.Payload
 			}
 		}
 	}()
 
-	fmt.Println("sending packet")
-	err = tc.SendToPath(buf.Bytes(), path)
-	if err != nil {
-		return err
-	}
+	timeOutDuration := time.Duration(timeout) * time.Second
+	timer := time.NewTimer(timeOutDuration)
+	timer.Stop()
 
-	return <-done
+	receivedPacketCount := 0
+	for i := 1; i <= numPackets; i++ {
+		timer.Reset(timeOutDuration)
+		err = tc.SendToPath(buf.Bytes(), path)
+		if err != nil {
+			return err
+		}
+
+		select {
+		case payload := <-seen:
+			timer.Stop()
+			receivedPacketCount++
+			fmt.Printf("received packet with payload: %s\n", payload)
+		case <-timer.C:
+			fmt.Println("timed out waiting for the packet")
+		}
+		packetLoss := float32(100) * float32(i - receivedPacketCount) / float32(i)
+		fmt.Printf("packet success rate: %d/%d, loss: %5f%% \n", receivedPacketCount, i, packetLoss)
+	}
+	return nil
 }

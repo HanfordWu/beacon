@@ -12,6 +12,8 @@ func init() {
 	SprayCmd.Flags().StringVarP(&source, "source", "s", "", "source IP/host (defaults to eth0 interface)")
 	SprayCmd.Flags().StringVarP(&dest, "dest", "d", "", "destination IP/host (required)")
 	SprayCmd.MarkFlagRequired("dest")
+	SprayCmd.Flags().IntVarP(&timeout, "timeout", "t", 3, "time (s) to wait on a packet to return")
+	SprayCmd.Flags().IntVarP(&numPackets, "num-packets", "n", 30, "number of packets to spray")
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
