@@ -9,10 +9,10 @@ var reverse bool
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
-	Use:   "braceroute",
-	Short: "the beacon of gondor has been lit",
-	Long:  "Localize network failures using IP in IP encapsulation",
-	Args: cobra.ExactArgs(1),
+	Use:     "braceroute",
+	Short:   "the beacon of gondor has been lit",
+	Long:    "Localize network failures using IP in IP encapsulation",
+	Args:    cobra.ExactArgs(1),
 	RunE:    rootRun,
 	Version: "v0.1.0",
 }

@@ -122,7 +122,7 @@ func spray(path beacon.Path, tc *beacon.TransportChannel) error {
 		case <-timer.C:
 			fmt.Println("timed out waiting for the packet")
 		}
-		packetLoss := float32(100) * float32(i - receivedPacketCount) / float32(i)
+		packetLoss := float32(100) * float32(i-receivedPacketCount) / float32(i)
 		fmt.Printf("packet success rate: %d/%d, loss: %5f%% \n", receivedPacketCount, i, packetLoss)
 	}
 	return nil
