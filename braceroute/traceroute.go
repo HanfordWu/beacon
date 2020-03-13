@@ -26,7 +26,7 @@ func Traceroute(destIP net.IP) error {
 		if err != nil {
 			fmt.Println(hop.String())
 		} else {
-			fmt.Println(hostname[0])
+			fmt.Printf("%s (%s)\n", hostname[0], hop.String())
 		}
 	}
 
