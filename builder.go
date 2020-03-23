@@ -2,7 +2,6 @@ package beacon
 
 import (
 	"errors"
-	"fmt"
 	"net"
 
 	"github.com/google/gopacket"
@@ -135,10 +134,6 @@ func CreateRoundTripPacketForPath(path Path, payload []byte, buf gopacket.Serial
 	udpLayer.SetNetworkLayerForChecksum(ipLayer)
 	constructedLayers = append(constructedLayers, udpLayer)
 	constructedLayers = append(constructedLayers, gopacket.Payload(payload))
-
-	for _, layer := range constructedLayers {
-		fmt.Println(layer)
-	}
 
 	err := gopacket.SerializeLayers(buf, opts, constructedLayers...)
 	if err != nil {

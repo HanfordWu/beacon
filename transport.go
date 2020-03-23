@@ -62,6 +62,21 @@ func (tc *TransportChannel) Rx() chan gopacket.Packet {
 	return tc.packetSource.Packets()
 }
 
+// RxWithCondition synchronously returns the first packet from the TransportChannel's
+// packetSource which satisfies the filter function.
+func (tc *TransportChannel) RxWithCondition(filter func(gopacket.Packet) bool) chan gopacket.Packet {
+	foundPacketChan := make(chan gopacket.Packet)
+	go func() {
+		for packet := range tc.Rx() {
+			if filter(packet) {
+				foundPacketChan <- packet
+			}
+		}
+	}()
+
+	return foundPacketChan
+}
+
 // SendTo sends a packet to the specified ip address
 func (tc *TransportChannel) SendTo(packetData []byte, destAddr net.IP) error {
 	// open a raw socket, the IPPROTO_RAW protocol implies IP_HDRINCL is enabled
