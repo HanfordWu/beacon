@@ -7,6 +7,8 @@ import (
 	"sync"
 
 	"github.com/trstruth/beacon"
+
+	"github.com/olekukonko/tablewriter"
 )
 
 type sprayStats struct {
@@ -48,16 +50,44 @@ func (s *sprayStats) recordResponse(hop string, successful bool) {
 }
 
 func (s *sprayStats) String() string {
-	header := fmt.Sprintf("Spray from %s to %s", s.source, s.dest)
-	columnNames := fmt.Sprintf("idx   hop        success rate         rx     tx")
-	rows := make([]string, len(s.path)-1)
+	// header := fmt.Sprintf("Spray from %s to %s", s.source, s.dest)
+	// columnNames := fmt.Sprintf("idx   hop        success rate         rx     tx")
+	tableString := &strings.Builder{}
+	table := tablewriter.NewWriter(tableString)
+
+	rows := make([][]string, len(s.path)-1)
 	for idx, hopStats := range s.hopStatSlice {
-		rows[idx] = fmt.Sprintf("%d - %s    %3f%%        %d     %d", idx+1, hopStats.name, hopStats.calculateSuccessRate(), hopStats.packetsRecvd, hopStats.packetsSent)
+		// rows[idx] = fmt.Sprintf("%d - %s    %3f%%        %d     %d", idx+1, hopStats.name, hopStats.calculateSuccessRate(), hopStats.packetsRecvd, hopStats.packetsSent)
+		rows[idx] = []string{
+			fmt.Sprintf("%d", idx+1),
+			hopStats.name,
+			fmt.Sprintf("%.3f%%", hopStats.calculateSuccessRate()),
+			fmt.Sprintf("%d", hopStats.packetsRecvd),
+			fmt.Sprintf("%d", hopStats.packetsSent),
+		}
 	}
 
-	outputRows := append([]string{header, columnNames}, rows...)
+	/*
+		outputRows := append([]string{header, columnNames}, rows...)
 
-	return strings.Join(outputRows, "\n")
+		return strings.Join(outputRows, "\n")
+	*/
+	table.SetHeader([]string{"idx", "hop", "success rate", "rx", "tx"})
+	table.SetAutoWrapText(false)
+	table.SetAutoFormatHeaders(true)
+	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
+	table.SetAlignment(tablewriter.ALIGN_LEFT)
+	table.SetCenterSeparator("")
+	table.SetColumnSeparator("")
+	table.SetRowSeparator("")
+	table.SetHeaderLine(false)
+	table.SetBorder(false)
+	table.SetTablePadding("\t") // pad with tabs
+	table.SetNoWhiteSpace(true)
+	table.AppendBulk(rows)
+	table.Render()
+
+	return tableString.String()
 }
 
 type hopStats struct {
