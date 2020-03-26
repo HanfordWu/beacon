@@ -69,10 +69,15 @@ func sprayRun(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("Finding path from %s to %s\n", srcIP, destIP)
-	path, err := beacon.GetPathFromSourceToDest(srcIP, destIP)
+	pathFinderTC, err := beacon.NewTransportChannel(beacon.WithBPFFilter("icmp"))
 	if err != nil {
 		return err
 	}
+	path, err := pathFinderTC.GetPathFromSourceToDest(srcIP, destIP)
+	if err != nil {
+		return err
+	}
+	pathFinderTC.Close()
 
 	// if the caller isn't the host, prepend the host to the path
 	if source != "" {
