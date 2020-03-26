@@ -2,6 +2,7 @@ package beacon
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"syscall"
 
@@ -27,6 +28,13 @@ type TransportChannelOption func(*TransportChannel)
 func WithBPFFilter(filter string) TransportChannelOption {
 	return func(tc *TransportChannel) {
 		tc.filter = filter
+	}
+}
+
+// WithInterface constructs an option to set the outbound interface to use for tx/rx
+func WithInterface(device string) TransportChannelOption {
+	return func(tc *TransportChannel) {
+		tc.deviceName = device
 	}
 }
 
@@ -108,6 +116,30 @@ func (tc *TransportChannel) SendToPath(packetData []byte, path Path) error {
 	return tc.SendTo(packetData, path[1])
 }
 
+// Close cleans up resources for the transport channel instance
 func (tc *TransportChannel) Close() {
 	tc.handle.Close()
+}
+
+// FindLocalIP finds the IP of the interface device of the TransportChannel instance
+func (tc *TransportChannel) FindLocalIP() (net.IP, error) {
+	devices, err := pcap.FindAllDevs()
+	if err != nil {
+		return nil, err
+	}
+
+	var eth0Device pcap.Interface
+	deviceFound := false
+	for _, device := range devices {
+		if device.Name == tc.deviceName {
+			deviceFound = true
+			eth0Device = device
+		}
+	}
+	if !deviceFound {
+		errMsg := fmt.Sprintf("Couldn't find a device named %s, or it did not have any addresses assigned to it", tc.deviceName)
+		return nil, errors.New(errMsg)
+	}
+
+	return eth0Device.Addresses[0].IP, nil
 }
