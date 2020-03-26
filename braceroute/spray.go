@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/google/gopacket"
@@ -24,6 +27,19 @@ var SprayCmd = &cobra.Command{
 	Long:  "longer description for spraying packets over a path",
 	RunE:  sprayRun,
 }
+
+type boomerangResult struct {
+	err       error
+	errorType boomerangErrorType
+	payload   string
+}
+
+type boomerangErrorType int
+
+const (
+	timedOut boomerangErrorType = iota
+	fatal    boomerangErrorType = iota
+)
 
 func initSpray() {
 	SprayCmd.Flags().StringVarP(&source, "source", "s", "", "source IP/host (defaults to eth0 interface)")
@@ -74,19 +90,102 @@ func sprayRun(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return spray(path, tc)
+	resultChannels := make([]chan boomerangResult, len(path)-1)
+	for i := 2; i <= len(path); i++ {
+		resultChannels[i-2] = spray(path[0:i], tc)
+	}
+
+	stats := newSprayStats(path)
+
+	handleResult := func(result boomerangResult) error {
+		if result.err != nil {
+			if result.errorType == fatal {
+				return result.err
+			} else if result.errorType == timedOut {
+				fmt.Printf("TIMED OUT payload is %s\n", string(result.payload))
+				stats.recordResponse(string(result.payload), false)
+				return nil
+			} else {
+				return errors.New("Unhandled error type: " + string(result.errorType))
+			}
+		}
+		fmt.Printf("SUCCESS result is %s\n", string(result.payload))
+		stats.recordResponse(string(result.payload), true)
+		return nil
+	}
+
+	for res := range merge(resultChannels...) {
+		err := handleResult(res)
+		if err != nil {
+			return err
+		}
+		fmt.Println("\033[H\033[2J")
+		fmt.Println(stats)
+	}
+
+	return nil
 }
 
-func spray(path beacon.Path, tc *beacon.TransportChannel) error {
-	payload := []byte("boomerang mode")
+func merge(resultChannels ...chan boomerangResult) <-chan boomerangResult {
+	var wg sync.WaitGroup
+	resultChannel := make(chan boomerangResult)
+
+	drain := func(c chan boomerangResult) {
+		for res := range c {
+			resultChannel <- res
+		}
+		wg.Done()
+	}
+
+	wg.Add(len(resultChannels))
+	for _, c := range resultChannels {
+		go drain(c)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChannel)
+	}()
+
+	return resultChannel
+}
+
+func spray(path beacon.Path, tc *beacon.TransportChannel) chan boomerangResult {
+	payload := []byte(path[len(path)-1].String())
+	resultChan := make(chan boomerangResult)
+
+	go func() {
+		for i := 1; i <= numPackets; i++ {
+			result := <-boomerang(payload, path, timeout)
+			resultChan <- result
+		}
+		close(resultChan)
+	}()
+
+	return resultChan
+}
+
+func boomerang(payload []byte, path beacon.Path, timeout int) chan boomerangResult {
+	seen := make(chan boomerangResult)
+	resultChan := make(chan boomerangResult)
+
 	buf := gopacket.NewSerializeBuffer()
 
 	err := beacon.CreateRoundTripPacketForPath(path, payload, buf)
 	if err != nil {
-		return err
+		resultChan <- boomerangResult{
+			err:       err,
+			errorType: fatal,
+		}
 	}
 
-	seen := make(chan []byte)
+	tc, err := beacon.NewTransportChannel(beacon.WithBPFFilter("ip proto 4"))
+	if err != nil {
+		resultChan <- boomerangResult{
+			err:       err,
+			errorType: fatal,
+		}
+	}
 
 	go func() {
 		for packet := range tc.Rx() {
@@ -95,35 +194,39 @@ func spray(path beacon.Path, tc *beacon.TransportChannel) error {
 			udp, _ := udpLayer.(*layers.UDP)
 			ip4, _ := ipv4Layer.(*layers.IPv4)
 
-			if ip4.DstIP.Equal(path[0]) && ip4.SrcIP.Equal(path[1]) {
-				// fmt.Printf("%s -> %s: %s\n", path[1], path[0], udp.Payload)
-				seen <- udp.Payload
+			if ip4.DstIP.Equal(path[0]) && ip4.SrcIP.Equal(path[1]) && bytes.Equal(udp.Payload, payload) {
+				seen <- boomerangResult{
+					payload: string(udp.Payload),
+				}
 			}
 		}
 	}()
 
-	timeOutDuration := time.Duration(timeout) * time.Second
-	timer := time.NewTimer(timeOutDuration)
-	timer.Stop()
+	go func() {
+		timeOutDuration := time.Duration(timeout) * time.Second
+		timer := time.NewTimer(timeOutDuration)
 
-	receivedPacketCount := 0
-	for i := 1; i <= numPackets; i++ {
-		timer.Reset(timeOutDuration)
 		err = tc.SendToPath(buf.Bytes(), path)
 		if err != nil {
-			return err
+			resultChan <- boomerangResult{
+				err:       err,
+				errorType: fatal,
+			}
 		}
 
 		select {
-		case payload := <-seen:
-			timer.Stop()
-			receivedPacketCount++
-			fmt.Printf("received packet with payload: %s\n", payload)
+		case result := <-seen:
+			resultChan <- result
 		case <-timer.C:
-			fmt.Println("timed out waiting for the packet")
+			resultChan <- boomerangResult{
+				payload:   path[len(path)-1].String(),
+				err:       errors.New("timed out waiting for packet from " + path[len(path)-1].String()),
+				errorType: timedOut,
+			}
 		}
-		packetLoss := float32(100) * float32(i-receivedPacketCount) / float32(i)
-		fmt.Printf("packet success rate: %d/%d, loss: %5f%% \n", receivedPacketCount, i, packetLoss)
-	}
-	return nil
+
+		tc.Close()
+	}()
+
+	return resultChan
 }

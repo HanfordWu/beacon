@@ -11,6 +11,7 @@ import (
 
 // TransportChannel is a struct which facilitates packet tx/rx
 type TransportChannel struct {
+	handle       *pcap.Handle
 	packetSource *gopacket.PacketSource
 	deviceName   string
 	snaplen      int32
@@ -45,6 +46,7 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 	if err != nil {
 		return nil, err
 	}
+	tc.handle = handle
 
 	if tc.filter != "" {
 		err = handle.SetBPFFilter(tc.filter)
@@ -60,6 +62,21 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 // Rx returns a packet channel over which packets will be pushed onto
 func (tc *TransportChannel) Rx() chan gopacket.Packet {
 	return tc.packetSource.Packets()
+}
+
+// RxWithCondition synchronously returns the first packet from the TransportChannel's
+// packetSource which satisfies the filter function.
+func (tc *TransportChannel) RxWithCondition(filter func(gopacket.Packet) bool) chan gopacket.Packet {
+	foundPacketChan := make(chan gopacket.Packet)
+	go func() {
+		for packet := range tc.Rx() {
+			if filter(packet) {
+				foundPacketChan <- packet
+			}
+		}
+	}()
+
+	return foundPacketChan
 }
 
 // SendTo sends a packet to the specified ip address
@@ -89,4 +106,8 @@ func (tc *TransportChannel) SendToPath(packetData []byte, path Path) error {
 		return errors.New("path must be non-empty")
 	}
 	return tc.SendTo(packetData, path[1])
+}
+
+func (tc *TransportChannel) Close() {
+	tc.handle.Close()
 }
