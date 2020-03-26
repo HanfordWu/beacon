@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+    "strings"
 	"sync"
 	"time"
 
@@ -18,6 +19,8 @@ var source string
 var dest string
 var timeout int
 var numPackets int
+
+var hops string
 
 // SprayCmd represents the spray subcommand which allows a user to send
 // a spray of packets over a path from source to dest
@@ -47,15 +50,24 @@ func initSpray() {
 	SprayCmd.MarkFlagRequired("dest")
 	SprayCmd.Flags().IntVarP(&timeout, "timeout", "t", 3, "time (s) to wait on a packet to return")
 	SprayCmd.Flags().IntVarP(&numPackets, "num-packets", "n", 30, "number of packets to spray")
+    SprayCmd.Flags().StringVarP(&hops, "path", "p", "", "manually define a comma separated list of hops to spray")
 }
 
 func sprayRun(cmd *cobra.Command, args []string) error {
 	var err error
 	var srcIP, destIP net.IP
 
+	pathFinderTC, err := beacon.NewTransportChannel(
+		beacon.WithBPFFilter("icmp"),
+		beacon.WithInterface(interfaceDevice),
+	)
+	if err != nil {
+		return err
+	}
+
 	// if no source was provided via cli flag, default to local
 	if source == "" {
-		srcIP, err = beacon.FindLocalIP()
+		srcIP, err = pathFinderTC.FindLocalIP()
 	} else {
 		srcIP, err = beacon.ParseIPFromString(source)
 	}
@@ -69,13 +81,8 @@ func sprayRun(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("Finding path from %s to %s\n", srcIP, destIP)
-	pathFinderTC, err := beacon.NewTransportChannel(
-		beacon.WithBPFFilter("icmp"),
-		beacon.WithInterface(interfaceDevice),
-	)
-	if err != nil {
-		return err
-	}
+
+    /*
 	path, err := pathFinderTC.GetPathFromSourceToDest(srcIP, destIP)
 	if err != nil {
 		return err
@@ -84,23 +91,47 @@ func sprayRun(cmd *cobra.Command, args []string) error {
 
 	// if the caller isn't the host, prepend the host to the path
 	if source != "" {
-		vantageIP, err := beacon.FindLocalIP()
+		vantageIP, err := pathFinderTC.FindLocalIP()
 		if err != nil {
 			return err
 		}
 		path = append([]net.IP{vantageIP}, path...)
 	}
-	// path = []net.IP{net.IP{10, 20, 30, 96}, net.IP{207, 46, 35, 118}, net.IP{104, 44, 18, 117}}
-	fmt.Printf("%v\n", path)
+    */
 
-	tc, err := beacon.NewTransportChannel(beacon.WithBPFFilter("ip proto 4"))
+	// path = []net.IP{net.IP{10, 20, 30, 96}, net.IP{207, 46, 35, 118}, net.IP{104, 44, 18, 117}}
+    // path := []net.IP{net.IP{13, 106, 165, 166}, net.IP{10, 0, 122, 175}, net.IP{13, 106, 162, 102}}
+    /*
+    path := []net.IP{
+        net.IP{13,106,165,197},
+        net.IP{10,0,68,70},
+        net.IP{10,0,68,72},
+        net.IP{10,0,121,72},
+        net.IP{10,0,121,70},
+        net.IP{10,0,121,90},
+        net.IP{10,0,121,2},
+        net.IP{10,0,121,4},
+    }
+    */
+
+    hopPath := strings.Split(hops, ",")
+    path := make([]net.IP, len(hopPath))
+    for idx, hop := range hopPath {
+        ipAddr, err := beacon.ParseIPFromString(hop)
+        if err != nil {
+            return err
+        }
+        path[idx] = ipAddr
+    }
+
+	fmt.Printf("%v\n", path)
 	if err != nil {
 		return err
 	}
 
 	resultChannels := make([]chan boomerangResult, len(path)-1)
 	for i := 2; i <= len(path); i++ {
-		resultChannels[i-2] = spray(path[0:i], tc)
+		resultChannels[i-2] = spray(path[0:i])
 	}
 
 	stats := newSprayStats(path)
@@ -158,7 +189,7 @@ func merge(resultChannels ...chan boomerangResult) <-chan boomerangResult {
 	return resultChannel
 }
 
-func spray(path beacon.Path, tc *beacon.TransportChannel) chan boomerangResult {
+func spray(path beacon.Path) chan boomerangResult {
 	payload := []byte(path[len(path)-1].String())
 	resultChan := make(chan boomerangResult)
 
@@ -187,7 +218,10 @@ func boomerang(payload []byte, path beacon.Path, timeout int) chan boomerangResu
 		}
 	}
 
-	tc, err := beacon.NewTransportChannel(beacon.WithBPFFilter("ip proto 4"))
+	tc, err := beacon.NewTransportChannel(
+        beacon.WithBPFFilter("ip proto 4"),
+        beacon.WithInterface(interfaceDevice),
+    )
 	if err != nil {
 		resultChan <- boomerangResult{
 			err:       err,

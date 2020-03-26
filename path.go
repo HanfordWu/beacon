@@ -74,7 +74,7 @@ func (tc *TransportChannel) GetPathChannelTo(destIP net.IP) (PathChannel, error)
 	found := make(chan net.IP)
 	done := make(chan error)
 
-	sourceIP, err := FindLocalIP()
+	sourceIP, err := tc.FindLocalIP()
 	if err != nil {
 		return pathChan, err
 	}
@@ -131,7 +131,7 @@ func (tc *TransportChannel) GetPathChannelFrom(destIP net.IP) (PathChannel, erro
 	found := make(chan net.IP)
 	done := make(chan error)
 
-	localIP, err := FindLocalIP()
+	localIP, err := tc.FindLocalIP()
 	if err != nil {
 		return pathChan, err
 	}
@@ -196,7 +196,7 @@ func (tc *TransportChannel) GetPathChannelFromSourceToDest(sourceIP, destIP net.
 	found := make(chan net.IP)
 	done := make(chan error)
 
-	localIP, err := FindLocalIP()
+	localIP, err := tc.FindLocalIP()
 	if err != nil {
 		return pathChan, err
 	}
