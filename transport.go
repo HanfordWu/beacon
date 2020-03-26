@@ -11,6 +11,7 @@ import (
 
 // TransportChannel is a struct which facilitates packet tx/rx
 type TransportChannel struct {
+	handle *pcap.Handle
 	packetSource *gopacket.PacketSource
 	deviceName   string
 	snaplen      int32
@@ -45,6 +46,7 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 	if err != nil {
 		return nil, err
 	}
+	tc.handle = handle
 
 	if tc.filter != "" {
 		err = handle.SetBPFFilter(tc.filter)
@@ -104,4 +106,8 @@ func (tc *TransportChannel) SendToPath(packetData []byte, path Path) error {
 		return errors.New("path must be non-empty")
 	}
 	return tc.SendTo(packetData, path[1])
+}
+
+func (tc *TransportChannel) Close() {
+	tc.handle.Close()
 }

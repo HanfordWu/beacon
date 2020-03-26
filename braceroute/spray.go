@@ -225,6 +225,8 @@ func boomerang(payload []byte, path beacon.Path, timeout int) chan boomerangResu
 				errorType: timedOut,
 			}
 		}
+
+		tc.Close()
 	}()
 
 	return resultChan
