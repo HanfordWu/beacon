@@ -158,7 +158,6 @@ func spray(path beacon.Path, tc *beacon.TransportChannel) chan boomerangResult {
 		for i := 1; i <= numPackets; i++ {
 			result := <-boomerang(payload, path, timeout)
 			resultChan <- result
-			time.Sleep(1 * time.Second)
 		}
 		close(resultChan)
 	}()

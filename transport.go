@@ -11,7 +11,7 @@ import (
 
 // TransportChannel is a struct which facilitates packet tx/rx
 type TransportChannel struct {
-	handle *pcap.Handle
+	handle       *pcap.Handle
 	packetSource *gopacket.PacketSource
 	deviceName   string
 	snaplen      int32
