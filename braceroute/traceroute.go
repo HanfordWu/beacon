@@ -16,7 +16,10 @@ func Traceroute(destIP net.IP) error {
 		fmt.Printf("Doing traceroute to %s (%s)\n", destHostname[0], destIP)
 	}
 
-	tc, err := beacon.NewTransportChannel(beacon.WithBPFFilter("icmp"))
+	tc, err := beacon.NewTransportChannel(
+		beacon.WithBPFFilter("icmp"),
+		beacon.WithInterface(interfaceDevice),
+	)
 	pc, err := tc.GetPathChannelTo(destIP)
 	if err != nil {
 		return err
