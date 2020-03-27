@@ -269,6 +269,7 @@ func boomerang(path beacon.Path, packetBuffer gopacket.SerializeBuffer, payload 
 	}()
 
 	go func() {
+		defer tc.Close()
 		timeOutDuration := time.Duration(timeout) * time.Second
 		timer := time.NewTimer(timeOutDuration)
 
@@ -292,7 +293,6 @@ func boomerang(path beacon.Path, packetBuffer gopacket.SerializeBuffer, payload 
 			}
 		}
 
-		tc.Close()
 	}()
 
 	return resultChan
