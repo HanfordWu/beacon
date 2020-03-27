@@ -50,8 +50,9 @@ type boomerangResult struct {
 type boomerangErrorType int
 
 const (
-	timedOut boomerangErrorType = iota
-	fatal    boomerangErrorType = iota
+	timedOut  boomerangErrorType = iota
+	fatal     boomerangErrorType = iota
+	sendError boomerangErrorType = iota
 )
 
 func initSpray() {
@@ -103,8 +104,8 @@ func sprayRun(cmd *cobra.Command, args []string) error {
 	handleResult := func(result boomerangResult) error {
 		if result.err != nil {
 			if result.errorType == fatal {
-                return fmt.Errorf("Fatal error while handling boomerang result: %s", result.err)
-			} else if result.errorType == timedOut {
+				return fmt.Errorf("Fatal error while handling boomerang result: %s", result.err)
+			} else if result.errorType == timedOut || result.errorType == sendError {
 				stats.recordResponse(string(result.payload), false)
 				return nil
 			} else {
@@ -249,7 +250,7 @@ func boomerang(path beacon.Path, packetBuffer gopacket.SerializeBuffer, payload 
 			err:       err,
 			errorType: fatal,
 		}
-        return resultChan
+		return resultChan
 	}
 
 	go func() {
@@ -275,7 +276,8 @@ func boomerang(path beacon.Path, packetBuffer gopacket.SerializeBuffer, payload 
 		if err != nil {
 			resultChan <- boomerangResult{
 				err:       err,
-				errorType: fatal,
+				errorType: sendError,
+				payload:   payload,
 			}
 		}
 
