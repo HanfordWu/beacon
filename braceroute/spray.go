@@ -108,14 +108,12 @@ func sprayRun(cmd *cobra.Command, args []string) error {
 			if result.errorType == fatal {
 				return result.err
 			} else if result.errorType == timedOut {
-				fmt.Printf("TIMED OUT payload is %s\n", string(result.payload))
 				stats.recordResponse(string(result.payload), false)
 				return nil
 			} else {
 				return errors.New("Unhandled error type: " + string(result.errorType))
 			}
 		}
-		fmt.Printf("SUCCESS result is %s\n", string(result.payload))
 		stats.recordResponse(string(result.payload), true)
 		return nil
 	}
@@ -219,9 +217,21 @@ func spray(path beacon.Path) chan boomerangResult {
 	payload := []byte(path[len(path)-1].String())
 	resultChan := make(chan boomerangResult)
 
+	buf := gopacket.NewSerializeBuffer()
+	err := beacon.CreateRoundTripPacketForPath(path, payload, buf)
+	if err != nil {
+		resultChan <- boomerangResult{
+			err:       err,
+			errorType: fatal,
+		}
+
+		return resultChan
+	}
+
+
 	go func() {
 		for i := 1; i <= numPackets; i++ {
-			result := <-boomerang(payload, path, timeout)
+			result := <-boomerang(path, buf, payload, timeout)
 			resultChan <- result
 		}
 		close(resultChan)
@@ -230,19 +240,9 @@ func spray(path beacon.Path) chan boomerangResult {
 	return resultChan
 }
 
-func boomerang(payload []byte, path beacon.Path, timeout int) chan boomerangResult {
+func boomerang(path beacon.Path, packetBuffer gopacket.SerializeBuffer, payload []byte, timeout int) chan boomerangResult {
 	seen := make(chan boomerangResult)
 	resultChan := make(chan boomerangResult)
-
-	buf := gopacket.NewSerializeBuffer()
-
-	err := beacon.CreateRoundTripPacketForPath(path, payload, buf)
-	if err != nil {
-		resultChan <- boomerangResult{
-			err:       err,
-			errorType: fatal,
-		}
-	}
 
 	tc, err := beacon.NewTransportChannel(
 		beacon.WithBPFFilter("ip proto 4"),
@@ -274,7 +274,7 @@ func boomerang(payload []byte, path beacon.Path, timeout int) chan boomerangResu
 		timeOutDuration := time.Duration(timeout) * time.Second
 		timer := time.NewTimer(timeOutDuration)
 
-		err = tc.SendToPath(buf.Bytes(), path)
+		err = tc.SendToPath(packetBuffer.Bytes(), path)
 		if err != nil {
 			resultChan <- boomerangResult{
 				err:       err,
