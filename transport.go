@@ -93,7 +93,7 @@ func (tc *TransportChannel) SendTo(packetData []byte, destAddr net.IP) error {
 	// http://man7.org/linux/man-pages/man7/raw.7.html
 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
 	if err != nil {
-		return err
+        return fmt.Errorf("Failed to create socket: %s", err)
 	}
 	defer syscall.Close(fd)
 
@@ -105,7 +105,12 @@ func (tc *TransportChannel) SendTo(packetData []byte, destAddr net.IP) error {
 	addr := syscall.SockaddrInet4{
 		Addr: [4]byte{destAddr[0], destAddr[1], destAddr[2], destAddr[3]},
 	}
-	return syscall.Sendto(fd, packetData, 0, &addr)
+
+    err = syscall.Sendto(fd, packetData, 0, &addr)
+    if err != nil {
+        return fmt.Errorf("Failed to send packetData to socket: %s", err)
+    }
+    return nil
 }
 
 // SendToPath sends a packet to the first hop in the specified path
