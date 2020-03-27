@@ -28,6 +28,16 @@ var SprayCmd = &cobra.Command{
 	Use:   "spray",
 	Short: "spray packets over a path",
 	Long:  "longer description for spraying packets over a path",
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		if dest == "" && hops == "" {
+			return errors.New("At least one of destination (-d) or path (-p) must be supplied")
+		}
+		if dest != "" && hops != "" {
+			return errors.New("Both destination (-d) and path (-p) cannot be supplied")
+		}
+
+		return nil
+	},
 	RunE:  sprayRun,
 }
 
@@ -47,7 +57,6 @@ const (
 func initSpray() {
 	SprayCmd.Flags().StringVarP(&source, "source", "s", "", "source IP/host (defaults to eth0 interface)")
 	SprayCmd.Flags().StringVarP(&dest, "dest", "d", "", "destination IP/host (required)")
-	SprayCmd.MarkFlagRequired("dest")
 	SprayCmd.Flags().IntVarP(&timeout, "timeout", "t", 3, "time (s) to wait on a packet to return")
 	SprayCmd.Flags().IntVarP(&numPackets, "num-packets", "n", 30, "number of packets to spray")
     SprayCmd.Flags().StringVarP(&hops, "path", "p", "", "manually define a comma separated list of hops to spray")
@@ -55,50 +64,18 @@ func initSpray() {
 
 func sprayRun(cmd *cobra.Command, args []string) error {
 	var err error
-	var srcIP, destIP net.IP
+	var path beacon.Path
 
-	pathFinderTC, err := beacon.NewTransportChannel(
-		beacon.WithBPFFilter("icmp"),
-		beacon.WithInterface(interfaceDevice),
-	)
-	if err != nil {
-		return err
-	}
-
-	// if no source was provided via cli flag, default to local
-	if source == "" {
-		srcIP, err = pathFinderTC.FindLocalIP()
-	} else {
-		srcIP, err = beacon.ParseIPFromString(source)
-	}
-	if err != nil {
-		return err
-	}
-
-	destIP, err = beacon.ParseIPFromString(dest)
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("Finding path from %s to %s\n", srcIP, destIP)
-
-    /*
-	path, err := pathFinderTC.GetPathFromSourceToDest(srcIP, destIP)
-	if err != nil {
-		return err
-	}
-	pathFinderTC.Close()
-
-	// if the caller isn't the host, prepend the host to the path
-	if source != "" {
-		vantageIP, err := pathFinderTC.FindLocalIP()
+	if dest != "" {
+		path, err = findPathFromSourceToDest()
 		if err != nil {
 			return err
 		}
-		path = append([]net.IP{vantageIP}, path...)
+	} else if hops != "" {
+		parsePathFromHopsString(hops)
+	} else {
+		return errors.New("At least one of destination (-d) or path (-p) must be supplied")
 	}
-    */
-
 	// path = []net.IP{net.IP{10, 20, 30, 96}, net.IP{207, 46, 35, 118}, net.IP{104, 44, 18, 117}}
     // path := []net.IP{net.IP{13, 106, 165, 166}, net.IP{10, 0, 122, 175}, net.IP{13, 106, 162, 102}}
     /*
@@ -113,16 +90,6 @@ func sprayRun(cmd *cobra.Command, args []string) error {
         net.IP{10,0,121,4},
     }
     */
-
-    hopPath := strings.Split(hops, ",")
-    path := make([]net.IP, len(hopPath))
-    for idx, hop := range hopPath {
-        ipAddr, err := beacon.ParseIPFromString(hop)
-        if err != nil {
-            return err
-        }
-        path[idx] = ipAddr
-    }
 
 	fmt.Printf("%v\n", path)
 	if err != nil {
@@ -163,6 +130,65 @@ func sprayRun(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func findPathFromSourceToDest() (beacon.Path, error) {
+	var srcIP, destIP net.IP
+
+	pathFinderTC, err := beacon.NewTransportChannel(
+		beacon.WithBPFFilter("icmp"),
+		beacon.WithInterface(interfaceDevice),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// if no source was provided via cli flag, default to local
+	if source == "" {
+		srcIP, err = pathFinderTC.FindLocalIP()
+	} else {
+		srcIP, err = beacon.ParseIPFromString(source)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	destIP, err = beacon.ParseIPFromString(dest)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Printf("Finding path from %s to %s\n", srcIP, destIP)
+
+	path, err := pathFinderTC.GetPathFromSourceToDest(srcIP, destIP)
+	if err != nil {
+		return nil, err
+	}
+	pathFinderTC.Close()
+
+	// if the caller isn't the host, prepend the host to the path
+	if source != "" {
+		vantageIP, err := pathFinderTC.FindLocalIP()
+		if err != nil {
+			return nil, err
+		}
+		path = append([]net.IP{vantageIP}, path...)
+	}
+
+	return path, nil
+}
+
+func parsePathFromHopsString(hops string) (beacon.Path, error) {
+    hopPath := strings.Split(hops, ",")
+    path := make([]net.IP, len(hopPath))
+    for idx, hop := range hopPath {
+        ipAddr, err := beacon.ParseIPFromString(hop)
+        if err != nil {
+			return nil, err
+		}
+		path[idx] = ipAddr
+	}
+	return path, nil
 }
 
 func merge(resultChannels ...chan boomerangResult) <-chan boomerangResult {
