@@ -5,21 +5,21 @@ import (
 	"errors"
 	"fmt"
 	"net"
-    "strings"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/trstruth/beacon"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/spf13/cobra"
-	"github.com/trstruth/beacon"
 )
 
 var source string
 var dest string
 var timeout int
 var numPackets int
-
 var hops string
 
 // SprayCmd represents the spray subcommand which allows a user to send
@@ -38,7 +38,7 @@ var SprayCmd = &cobra.Command{
 
 		return nil
 	},
-	RunE:  sprayRun,
+	RunE: sprayRun,
 }
 
 type boomerangResult struct {
@@ -59,7 +59,7 @@ func initSpray() {
 	SprayCmd.Flags().StringVarP(&dest, "dest", "d", "", "destination IP/host (required)")
 	SprayCmd.Flags().IntVarP(&timeout, "timeout", "t", 3, "time (s) to wait on a packet to return")
 	SprayCmd.Flags().IntVarP(&numPackets, "num-packets", "n", 30, "number of packets to spray")
-    SprayCmd.Flags().StringVarP(&hops, "path", "p", "", "manually define a comma separated list of hops to spray")
+	SprayCmd.Flags().StringVarP(&hops, "path", "p", "", "manually define a comma separated list of hops to spray")
 }
 
 func sprayRun(cmd *cobra.Command, args []string) error {
@@ -77,19 +77,19 @@ func sprayRun(cmd *cobra.Command, args []string) error {
 		return errors.New("At least one of destination (-d) or path (-p) must be supplied")
 	}
 	// path = []net.IP{net.IP{10, 20, 30, 96}, net.IP{207, 46, 35, 118}, net.IP{104, 44, 18, 117}}
-    // path := []net.IP{net.IP{13, 106, 165, 166}, net.IP{10, 0, 122, 175}, net.IP{13, 106, 162, 102}}
-    /*
-    path := []net.IP{
-        net.IP{13,106,165,197},
-        net.IP{10,0,68,70},
-        net.IP{10,0,68,72},
-        net.IP{10,0,121,72},
-        net.IP{10,0,121,70},
-        net.IP{10,0,121,90},
-        net.IP{10,0,121,2},
-        net.IP{10,0,121,4},
-    }
-    */
+	// path := []net.IP{net.IP{13, 106, 165, 166}, net.IP{10, 0, 122, 175}, net.IP{13, 106, 162, 102}}
+	/*
+	   path := []net.IP{
+	       net.IP{13,106,165,197},
+	       net.IP{10,0,68,70},
+	       net.IP{10,0,68,72},
+	       net.IP{10,0,121,72},
+	       net.IP{10,0,121,70},
+	       net.IP{10,0,121,90},
+	       net.IP{10,0,121,2},
+	       net.IP{10,0,121,4},
+	   }
+	*/
 
 	fmt.Printf("%v\n", path)
 	if err != nil {
@@ -179,11 +179,11 @@ func findPathFromSourceToDest() (beacon.Path, error) {
 }
 
 func parsePathFromHopsString(hops string) (beacon.Path, error) {
-    hopPath := strings.Split(hops, ",")
-    path := make([]net.IP, len(hopPath))
-    for idx, hop := range hopPath {
-        ipAddr, err := beacon.ParseIPFromString(hop)
-        if err != nil {
+	hopPath := strings.Split(hops, ",")
+	path := make([]net.IP, len(hopPath))
+	for idx, hop := range hopPath {
+		ipAddr, err := beacon.ParseIPFromString(hop)
+		if err != nil {
 			return nil, err
 		}
 		path[idx] = ipAddr
@@ -245,9 +245,9 @@ func boomerang(payload []byte, path beacon.Path, timeout int) chan boomerangResu
 	}
 
 	tc, err := beacon.NewTransportChannel(
-        beacon.WithBPFFilter("ip proto 4"),
-        beacon.WithInterface(interfaceDevice),
-    )
+		beacon.WithBPFFilter("ip proto 4"),
+		beacon.WithInterface(interfaceDevice),
+	)
 	if err != nil {
 		resultChan <- boomerangResult{
 			err:       err,
