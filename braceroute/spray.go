@@ -269,7 +269,6 @@ func boomerang(path beacon.Path, packetBuffer gopacket.SerializeBuffer, payload 
 	}()
 
 	go func() {
-		defer tc.Close()
 		timeOutDuration := time.Duration(timeout) * time.Second
 		timer := time.NewTimer(timeOutDuration)
 
@@ -280,6 +279,10 @@ func boomerang(path beacon.Path, packetBuffer gopacket.SerializeBuffer, payload 
 				errorType: sendError,
 				payload:   path[len(path)-1].String(),
 			}
+            fmt.Println("Closing the resource after error")
+            tc.Close()
+            fmt.Println("closed the resource after error")
+            return
 		}
 
 		select {
@@ -292,7 +295,8 @@ func boomerang(path beacon.Path, packetBuffer gopacket.SerializeBuffer, payload 
 				errorType: timedOut,
 			}
 		}
-
+        fmt.Println("Closing the resource")
+        tc.Close()
 	}()
 
 	return resultChan
