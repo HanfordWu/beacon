@@ -92,12 +92,10 @@ func sprayRun(cmd *cobra.Command, args []string) error {
 	*/
 
 	fmt.Printf("%v\n", path)
-	if err != nil {
-		return err
-	}
 
 	resultChannels := make([]chan boomerangResult, len(path)-1)
 	for i := 2; i <= len(path); i++ {
+		fmt.Printf("spraying hop index %d\n", i)
 		resultChannels[i-2] = spray(path[0:i])
 	}
 
@@ -217,9 +215,11 @@ func spray(path beacon.Path) chan boomerangResult {
 	payload := []byte(path[len(path)-1].String())
 	resultChan := make(chan boomerangResult)
 
+	fmt.Printf("Creating serialize buffer for path %v\n", path)
 	buf := gopacket.NewSerializeBuffer()
 	err := beacon.CreateRoundTripPacketForPath(path, payload, buf)
 	if err != nil {
+		fmt.Printf("error while creating round trip packet for path %v\n", path)
 		resultChan <- boomerangResult{
 			err:       err,
 			errorType: fatal,
@@ -227,7 +227,6 @@ func spray(path beacon.Path) chan boomerangResult {
 
 		return resultChan
 	}
-
 
 	go func() {
 		for i := 1; i <= numPackets; i++ {
@@ -241,6 +240,7 @@ func spray(path beacon.Path) chan boomerangResult {
 }
 
 func boomerang(path beacon.Path, packetBuffer gopacket.SerializeBuffer, payload []byte, timeout int) chan boomerangResult {
+	fmt.Printf("Running boomerang for path: %v\n", path)
 	seen := make(chan boomerangResult)
 	resultChan := make(chan boomerangResult)
 
