@@ -277,7 +277,7 @@ func boomerang(path beacon.Path, packetBuffer gopacket.SerializeBuffer, payload 
 			resultChan <- boomerangResult{
 				err:       err,
 				errorType: sendError,
-				payload:   payload,
+				payload:   path[len(path)-1].String(),
 			}
 		}
 
