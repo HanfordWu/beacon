@@ -68,13 +68,13 @@ func sprayRun(cmd *cobra.Command, args []string) error {
 
 	if dest != "" {
 		path, err = findPathFromSourceToDest()
-		if err != nil {
-			return err
-		}
 	} else if hops != "" {
-		parsePathFromHopsString(hops)
+		path, err = parsePathFromHopsString(hops)
 	} else {
 		return errors.New("At least one of destination (-d) or path (-p) must be supplied")
+	}
+	if err != nil {
+		return err
 	}
 	// path = []net.IP{net.IP{10, 20, 30, 96}, net.IP{207, 46, 35, 118}, net.IP{104, 44, 18, 117}}
 	// path := []net.IP{net.IP{13, 106, 165, 166}, net.IP{10, 0, 122, 175}, net.IP{13, 106, 162, 102}}
