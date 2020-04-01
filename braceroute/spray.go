@@ -5,19 +5,22 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/trstruth/beacon"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/spf13/cobra"
-	"github.com/trstruth/beacon"
 )
 
 var source string
 var dest string
 var timeout int
 var numPackets int
+var hops string
 
 // SprayCmd represents the spray subcommand which allows a user to send
 // a spray of packets over a path from source to dest
@@ -25,7 +28,17 @@ var SprayCmd = &cobra.Command{
 	Use:   "spray",
 	Short: "spray packets over a path",
 	Long:  "longer description for spraying packets over a path",
-	RunE:  sprayRun,
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		if dest == "" && hops == "" {
+			return errors.New("At least one of destination (-d) or path (-p) must be supplied")
+		}
+		if dest != "" && hops != "" {
+			return errors.New("Both destination (-d) and path (-p) cannot be supplied")
+		}
+
+		return nil
+	},
+	RunE: sprayRun,
 }
 
 type boomerangResult struct {
@@ -37,62 +50,53 @@ type boomerangResult struct {
 type boomerangErrorType int
 
 const (
-	timedOut boomerangErrorType = iota
-	fatal    boomerangErrorType = iota
+	timedOut  boomerangErrorType = iota
+	fatal     boomerangErrorType = iota
+	sendError boomerangErrorType = iota
 )
 
 func initSpray() {
 	SprayCmd.Flags().StringVarP(&source, "source", "s", "", "source IP/host (defaults to eth0 interface)")
 	SprayCmd.Flags().StringVarP(&dest, "dest", "d", "", "destination IP/host (required)")
-	SprayCmd.MarkFlagRequired("dest")
 	SprayCmd.Flags().IntVarP(&timeout, "timeout", "t", 3, "time (s) to wait on a packet to return")
 	SprayCmd.Flags().IntVarP(&numPackets, "num-packets", "n", 30, "number of packets to spray")
+	SprayCmd.Flags().StringVarP(&hops, "path", "p", "", "manually define a comma separated list of hops to spray")
 }
 
 func sprayRun(cmd *cobra.Command, args []string) error {
 	var err error
-	var srcIP, destIP net.IP
+	var path beacon.Path
 
-	// if no source was provided via cli flag, default to local
-	if source == "" {
-		srcIP, err = beacon.FindLocalIP()
+	if dest != "" {
+		path, err = findPathFromSourceToDest()
+	} else if hops != "" {
+		path, err = parsePathFromHopsString(hops)
 	} else {
-		srcIP, err = beacon.ParseIPFromString(source)
+		return errors.New("At least one of destination (-d) or path (-p) must be supplied")
 	}
 	if err != nil {
 		return err
-	}
-
-	destIP, err = beacon.ParseIPFromString(dest)
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("Finding path from %s to %s\n", srcIP, destIP)
-	path, err := beacon.GetPathFromSourceToDest(srcIP, destIP)
-	if err != nil {
-		return err
-	}
-
-	// if the caller isn't the host, prepend the host to the path
-	if source != "" {
-		vantageIP, err := beacon.FindLocalIP()
-		if err != nil {
-			return err
-		}
-		path = append([]net.IP{vantageIP}, path...)
 	}
 	// path = []net.IP{net.IP{10, 20, 30, 96}, net.IP{207, 46, 35, 118}, net.IP{104, 44, 18, 117}}
-	fmt.Printf("%v\n", path)
+	// path := []net.IP{net.IP{13, 106, 165, 166}, net.IP{10, 0, 122, 175}, net.IP{13, 106, 162, 102}}
+	/*
+	   path := []net.IP{
+	       net.IP{13,106,165,197},
+	       net.IP{10,0,68,70},
+	       net.IP{10,0,68,72},
+	       net.IP{10,0,121,72},
+	       net.IP{10,0,121,70},
+	       net.IP{10,0,121,90},
+	       net.IP{10,0,121,2},
+	       net.IP{10,0,121,4},
+	   }
+	*/
 
-	tc, err := beacon.NewTransportChannel(beacon.WithBPFFilter("ip proto 4"))
-	if err != nil {
-		return err
-	}
+	fmt.Printf("%v\n", path)
 
 	resultChannels := make([]chan boomerangResult, len(path)-1)
 	for i := 2; i <= len(path); i++ {
-		resultChannels[i-2] = spray(path[0:i], tc)
+		resultChannels[i-2] = spray(path[0:i])
 	}
 
 	stats := newSprayStats(path)
@@ -100,16 +104,14 @@ func sprayRun(cmd *cobra.Command, args []string) error {
 	handleResult := func(result boomerangResult) error {
 		if result.err != nil {
 			if result.errorType == fatal {
-				return result.err
-			} else if result.errorType == timedOut {
-				fmt.Printf("TIMED OUT payload is %s\n", string(result.payload))
+				return fmt.Errorf("Fatal error while handling boomerang result: %s", result.err)
+			} else if result.errorType == timedOut || result.errorType == sendError {
 				stats.recordResponse(string(result.payload), false)
 				return nil
 			} else {
 				return errors.New("Unhandled error type: " + string(result.errorType))
 			}
 		}
-		fmt.Printf("SUCCESS result is %s\n", string(result.payload))
 		stats.recordResponse(string(result.payload), true)
 		return nil
 	}
@@ -124,6 +126,65 @@ func sprayRun(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func findPathFromSourceToDest() (beacon.Path, error) {
+	var srcIP, destIP net.IP
+
+	pathFinderTC, err := beacon.NewTransportChannel(
+		beacon.WithBPFFilter("icmp"),
+		beacon.WithInterface(interfaceDevice),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// if no source was provided via cli flag, default to local
+	if source == "" {
+		srcIP, err = pathFinderTC.FindLocalIP()
+	} else {
+		srcIP, err = beacon.ParseIPFromString(source)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	destIP, err = beacon.ParseIPFromString(dest)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Printf("Finding path from %s to %s\n", srcIP, destIP)
+
+	path, err := pathFinderTC.GetPathFromSourceToDest(srcIP, destIP)
+	if err != nil {
+		return nil, err
+	}
+	pathFinderTC.Close()
+
+	// if the caller isn't the host, prepend the host to the path
+	if source != "" {
+		vantageIP, err := pathFinderTC.FindLocalIP()
+		if err != nil {
+			return nil, err
+		}
+		path = append([]net.IP{vantageIP}, path...)
+	}
+
+	return path, nil
+}
+
+func parsePathFromHopsString(hops string) (beacon.Path, error) {
+	hopPath := strings.Split(hops, ",")
+	path := make([]net.IP, len(hopPath))
+	for idx, hop := range hopPath {
+		ipAddr, err := beacon.ParseIPFromString(hop)
+		if err != nil {
+			return nil, err
+		}
+		path[idx] = ipAddr
+	}
+	return path, nil
 }
 
 func merge(resultChannels ...chan boomerangResult) <-chan boomerangResult {
@@ -150,14 +211,37 @@ func merge(resultChannels ...chan boomerangResult) <-chan boomerangResult {
 	return resultChannel
 }
 
-func spray(path beacon.Path, tc *beacon.TransportChannel) chan boomerangResult {
+func spray(path beacon.Path) chan boomerangResult {
 	payload := []byte(path[len(path)-1].String())
 	resultChan := make(chan boomerangResult)
 
+	tc, err := beacon.NewTransportChannel(
+		beacon.WithBPFFilter("ip proto 4"),
+		beacon.WithInterface(interfaceDevice),
+		// beacon.WithTimeout(timeout),
+	)
+	if err != nil {
+		resultChan <- boomerangResult{
+			err:       err,
+			errorType: fatal,
+		}
+	}
+
+	buf := gopacket.NewSerializeBuffer()
+	err = beacon.CreateRoundTripPacketForPath(path, payload, buf)
+	if err != nil {
+		resultChan <- boomerangResult{
+			err:       err,
+			errorType: fatal,
+		}
+
+		return resultChan
+	}
+
 	go func() {
+		defer tc.Close()
 		for i := 1; i <= numPackets; i++ {
-			result := <-boomerang(payload, path, timeout)
-			resultChan <- result
+			resultChan <- boomerang(path, tc, buf, payload, timeout)
 		}
 		close(resultChan)
 	}()
@@ -165,27 +249,9 @@ func spray(path beacon.Path, tc *beacon.TransportChannel) chan boomerangResult {
 	return resultChan
 }
 
-func boomerang(payload []byte, path beacon.Path, timeout int) chan boomerangResult {
+func boomerang(path beacon.Path, tc *beacon.TransportChannel, packetBuffer gopacket.SerializeBuffer, payload []byte, timeout int) boomerangResult {
 	seen := make(chan boomerangResult)
 	resultChan := make(chan boomerangResult)
-
-	buf := gopacket.NewSerializeBuffer()
-
-	err := beacon.CreateRoundTripPacketForPath(path, payload, buf)
-	if err != nil {
-		resultChan <- boomerangResult{
-			err:       err,
-			errorType: fatal,
-		}
-	}
-
-	tc, err := beacon.NewTransportChannel(beacon.WithBPFFilter("ip proto 4"))
-	if err != nil {
-		resultChan <- boomerangResult{
-			err:       err,
-			errorType: fatal,
-		}
-	}
 
 	go func() {
 		for packet := range tc.Rx() {
@@ -198,6 +264,7 @@ func boomerang(payload []byte, path beacon.Path, timeout int) chan boomerangResu
 				seen <- boomerangResult{
 					payload: string(udp.Payload),
 				}
+				return
 			}
 		}
 	}()
@@ -206,12 +273,14 @@ func boomerang(payload []byte, path beacon.Path, timeout int) chan boomerangResu
 		timeOutDuration := time.Duration(timeout) * time.Second
 		timer := time.NewTimer(timeOutDuration)
 
-		err = tc.SendToPath(buf.Bytes(), path)
+		err := tc.SendToPath(packetBuffer.Bytes(), path)
 		if err != nil {
 			resultChan <- boomerangResult{
 				err:       err,
-				errorType: fatal,
+				errorType: sendError,
+				payload:   path[len(path)-1].String(),
 			}
+			return
 		}
 
 		select {
@@ -224,9 +293,7 @@ func boomerang(payload []byte, path beacon.Path, timeout int) chan boomerangResu
 				errorType: timedOut,
 			}
 		}
-
-		tc.Close()
 	}()
 
-	return resultChan
+	return <-resultChan
 }

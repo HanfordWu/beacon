@@ -16,7 +16,11 @@ func ReverseTraceroute(destIP net.IP) error {
 		fmt.Printf("Doing reverse traceroute from %s (%s)\n", destHostname[0], destIP)
 	}
 
-	pc, err := beacon.GetPathChannelFrom(destIP)
+	tc, err := beacon.NewTransportChannel(
+		beacon.WithBPFFilter("icmp"),
+		beacon.WithInterface(interfaceDevice),
+	)
+	pc, err := tc.GetPathChannelFrom(destIP)
 	if err != nil {
 		return err
 	}

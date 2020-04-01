@@ -1,6 +1,8 @@
 package beacon
 
 import (
+	"errors"
+	"fmt"
 	"net"
 
 	"github.com/google/gopacket"
@@ -14,10 +16,10 @@ type Path []net.IP
 type PathChannel chan net.IP
 
 // GetPathTo returns a Path to a destination IP from the caller
-func GetPathTo(destIP net.IP) (Path, error) {
+func (tc *TransportChannel) GetPathTo(destIP net.IP) (Path, error) {
 	path := make([]net.IP, 0)
 
-	pc, err := GetPathChannelTo(destIP)
+	pc, err := tc.GetPathChannelTo(destIP)
 	if err != nil {
 		return path, err
 	}
@@ -30,10 +32,10 @@ func GetPathTo(destIP net.IP) (Path, error) {
 }
 
 // GetPathFrom returns a Path from a destination IP back to the caller
-func GetPathFrom(destIP net.IP) (Path, error) {
+func (tc *TransportChannel) GetPathFrom(destIP net.IP) (Path, error) {
 	path := make([]net.IP, 0)
 
-	pc, err := GetPathChannelFrom(destIP)
+	pc, err := tc.GetPathChannelFrom(destIP)
 	if err != nil {
 		return path, err
 	}
@@ -46,10 +48,10 @@ func GetPathFrom(destIP net.IP) (Path, error) {
 }
 
 // GetPathFromSourceToDest returns a Path from a sourceIP to a destIP
-func GetPathFromSourceToDest(sourceIP, destIP net.IP) (Path, error) {
+func (tc *TransportChannel) GetPathFromSourceToDest(sourceIP, destIP net.IP) (Path, error) {
 	path := make([]net.IP, 0)
 
-	pc, err := GetPathChannelFromSourceToDest(sourceIP, destIP)
+	pc, err := tc.GetPathChannelFromSourceToDest(sourceIP, destIP)
 	if err != nil {
 		return path, err
 	}
@@ -62,17 +64,17 @@ func GetPathFromSourceToDest(sourceIP, destIP net.IP) (Path, error) {
 }
 
 // GetPathChannelTo returns a PathChannel to a destination IP from the caller
-func GetPathChannelTo(destIP net.IP) (PathChannel, error) {
-	tc, err := NewTransportChannel(WithBPFFilter("icmp"))
-	if err != nil {
-		return nil, err
+func (tc *TransportChannel) GetPathChannelTo(destIP net.IP) (PathChannel, error) {
+	if tc.filter != "icmp" {
+		errMsg := fmt.Sprintf("BPF filter must be icmp: got %s instead", tc.filter)
+		return nil, errors.New(errMsg)
 	}
 
 	pathChan := make(PathChannel)
 	found := make(chan net.IP)
 	done := make(chan error)
 
-	sourceIP, err := FindLocalIP()
+	sourceIP, err := tc.FindLocalIP()
 	if err != nil {
 		return pathChan, err
 	}
@@ -119,17 +121,17 @@ func GetPathChannelTo(destIP net.IP) (PathChannel, error) {
 }
 
 // GetPathChannelFrom returns a PathChannel from a destination IP back to the caller
-func GetPathChannelFrom(destIP net.IP) (PathChannel, error) {
-	tc, err := NewTransportChannel(WithBPFFilter("icmp"))
-	if err != nil {
-		return nil, err
+func (tc *TransportChannel) GetPathChannelFrom(destIP net.IP) (PathChannel, error) {
+	if tc.filter != "icmp" {
+		errMsg := fmt.Sprintf("BPF filter must be icmp: got %s instead", tc.filter)
+		return nil, errors.New(errMsg)
 	}
 
 	pathChan := make(PathChannel)
 	found := make(chan net.IP)
 	done := make(chan error)
 
-	localIP, err := FindLocalIP()
+	localIP, err := tc.FindLocalIP()
 	if err != nil {
 		return pathChan, err
 	}
@@ -184,22 +186,22 @@ func GetPathChannelFrom(destIP net.IP) (PathChannel, error) {
 }
 
 // GetPathChannelFromSourceToDest returns a PathChannel from a sourceIP to a destIP
-func GetPathChannelFromSourceToDest(sourceIP, destIP net.IP) (PathChannel, error) {
-	tc, err := NewTransportChannel(WithBPFFilter("icmp"))
-	if err != nil {
-		return nil, err
+func (tc *TransportChannel) GetPathChannelFromSourceToDest(sourceIP, destIP net.IP) (PathChannel, error) {
+	if tc.filter != "icmp" {
+		errMsg := fmt.Sprintf("BPF filter must be icmp: got %s instead", tc.filter)
+		return nil, errors.New(errMsg)
 	}
 
 	pathChan := make(PathChannel)
 	found := make(chan net.IP)
 	done := make(chan error)
 
-	localIP, err := FindLocalIP()
+	localIP, err := tc.FindLocalIP()
 	if err != nil {
 		return pathChan, err
 	}
 	if sourceIP.Equal(localIP) {
-		return GetPathChannelTo(destIP)
+		return tc.GetPathChannelTo(destIP)
 	}
 
 	go func() {
