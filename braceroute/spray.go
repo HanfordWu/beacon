@@ -243,6 +243,7 @@ func boomerang(path beacon.Path, packetBuffer gopacket.SerializeBuffer, payload 
 	tc, err := beacon.NewTransportChannel(
 		beacon.WithBPFFilter("ip proto 4"),
 		beacon.WithInterface(interfaceDevice),
+		beacon.WithTimeout(timeout),
 	)
 	if err != nil {
 		return boomerangResult{

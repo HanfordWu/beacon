@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"syscall"
+	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
@@ -17,6 +18,7 @@ type TransportChannel struct {
 	deviceName   string
 	snaplen      int32
 	filter       string
+	timeout      int
 }
 
 // TransportChannelOption modifies a TransportChannel struct
@@ -38,6 +40,13 @@ func WithInterface(device string) TransportChannelOption {
 	}
 }
 
+// WithTimeout sets the timeout on the enclosed pcap Handle
+func WithTimeout(timeout int) TransportChannelOption {
+	return func(tc *TransportChannel) {
+		tc.timeout = timeout
+	}
+}
+
 // NewTransportChannel instantiates a new transport chanel
 func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, error) {
 	tc := &TransportChannel{
@@ -50,7 +59,13 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 		opt(tc)
 	}
 
-	handle, err := pcap.OpenLive(tc.deviceName, tc.snaplen, true, pcap.BlockForever)
+	var handleTimeout time.Duration
+	if tc.timeout != 0 {
+		handleTimeout = time.Duration(tc.timeout) * time.Second
+	} else {
+		handleTimeout = pcap.BlockForever
+	}
+	handle, err := pcap.OpenLive(tc.deviceName, tc.snaplen, true, handleTimeout)
 	if err != nil {
 		return nil, err
 	}
