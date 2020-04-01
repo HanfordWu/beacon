@@ -228,8 +228,7 @@ func spray(path beacon.Path) chan boomerangResult {
 
 	go func() {
 		for i := 1; i <= numPackets; i++ {
-			result := <-boomerang(path, buf, payload, timeout)
-			resultChan <- result
+			resultChan <- boomerang(path, buf, payload, timeout)
 		}
 		close(resultChan)
 	}()
@@ -237,7 +236,7 @@ func spray(path beacon.Path) chan boomerangResult {
 	return resultChan
 }
 
-func boomerang(path beacon.Path, packetBuffer gopacket.SerializeBuffer, payload []byte, timeout int) chan boomerangResult {
+func boomerang(path beacon.Path, packetBuffer gopacket.SerializeBuffer, payload []byte, timeout int) boomerangResult {
 	seen := make(chan boomerangResult)
 	resultChan := make(chan boomerangResult)
 
@@ -246,11 +245,10 @@ func boomerang(path beacon.Path, packetBuffer gopacket.SerializeBuffer, payload 
 		beacon.WithInterface(interfaceDevice),
 	)
 	if err != nil {
-		resultChan <- boomerangResult{
+		return boomerangResult{
 			err:       err,
 			errorType: fatal,
 		}
-		return resultChan
 	}
 
 	go func() {
@@ -264,11 +262,13 @@ func boomerang(path beacon.Path, packetBuffer gopacket.SerializeBuffer, payload 
 				seen <- boomerangResult{
 					payload: string(udp.Payload),
 				}
+				return
 			}
 		}
 	}()
 
 	go func() {
+		defer tc.Close()
 		timeOutDuration := time.Duration(timeout) * time.Second
 		timer := time.NewTimer(timeOutDuration)
 
@@ -279,10 +279,7 @@ func boomerang(path beacon.Path, packetBuffer gopacket.SerializeBuffer, payload 
 				errorType: sendError,
 				payload:   path[len(path)-1].String(),
 			}
-            fmt.Println("Closing the resource after error")
-            tc.Close()
-            fmt.Println("closed the resource after error")
-            return
+			return
 		}
 
 		select {
@@ -295,9 +292,7 @@ func boomerang(path beacon.Path, packetBuffer gopacket.SerializeBuffer, payload 
 				errorType: timedOut,
 			}
 		}
-        fmt.Println("Closing the resource")
-        tc.Close()
 	}()
 
-	return resultChan
+	return <-resultChan
 }
