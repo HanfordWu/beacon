@@ -183,6 +183,30 @@ func (tc *TransportChannel) SendToPath(packetData []byte, path Path) error {
 	return tc.SendTo(packetData, path[1])
 }
 
+// Reset resets the transport channel instance
+func (tc *TransportChannel) Reset() error {
+	var handleTimeout time.Duration
+	if tc.timeout != 0 {
+		handleTimeout = time.Duration(tc.timeout) * time.Second
+	} else {
+		handleTimeout = pcap.BlockForever
+	}
+	handle, err := pcap.OpenLive(tc.deviceName, tc.snaplen, true, handleTimeout)
+	if err != nil {
+		return err
+	}
+	tc.handle = handle
+
+	if tc.filter != "" {
+		err = handle.SetBPFFilter(tc.filter)
+		if err != nil {
+			return err
+		}
+	}
+	tc.packetSource = gopacket.NewPacketSource(handle, handle.LinkType())
+	return nil
+}
+
 // Close cleans up resources for the transport channel instance
 func (tc *TransportChannel) Close() {
 	tc.handle.Close()

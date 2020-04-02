@@ -52,9 +52,23 @@ func Spray(path Path, tc *TransportChannel, numPackets int, timeout int) chan Bo
 	}
 
 	go func() {
-		defer tc.Close()
 		for i := 1; i <= numPackets; i++ {
-			resultChan <- Boomerang(path, tc, buf, payload, timeout)
+			result := Boomerang(path, tc, buf, payload, timeout)
+			if result.Err != nil && (result.ErrorType == timedOut || result.ErrorType == sendError) {
+				// tc.Close()
+				tc, err = NewTransportChannel(
+					WithBPFFilter(tc.filter),
+					WithInterface(tc.deviceName),
+				)
+				if err != nil {
+					resultChan <- BoomerangResult{
+						Err:       err,
+						ErrorType: fatal,
+					}
+					return
+				}
+			}
+			resultChan <- result
 		}
 		close(resultChan)
 	}()
