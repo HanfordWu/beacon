@@ -62,16 +62,15 @@ func sprayRun(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("%v\n", path)
 
-	tc, err := beacon.NewTransportChannel(
-		beacon.WithBPFFilter("ip proto 4"),
-		beacon.WithInterface(interfaceDevice),
-	)
-	if err != nil {
-		return err
-	}
-
 	resultChannels := make([]chan beacon.BoomerangResult, len(path)-1)
 	for i := 2; i <= len(path); i++ {
+		tc, err := beacon.NewTransportChannel(
+			beacon.WithBPFFilter("ip proto 4"),
+			beacon.WithInterface(interfaceDevice),
+		)
+		if err != nil {
+			return err
+		}
 		resultChannels[i-2] = beacon.Spray(path[0:i], tc, numPackets, timeout)
 	}
 
