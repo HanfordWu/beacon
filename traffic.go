@@ -1,7 +1,6 @@
 package beacon
 
-
-import(
+import (
 	"bytes"
 	"errors"
 	"time"
@@ -20,6 +19,7 @@ type BoomerangResult struct {
 
 // BoomerangErrorType is an enum of possible errors encountered during a run of boomerang
 type BoomerangErrorType int
+
 const (
 	timedOut  BoomerangErrorType = iota
 	fatal     BoomerangErrorType = iota
