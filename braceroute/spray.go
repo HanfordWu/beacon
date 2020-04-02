@@ -95,7 +95,7 @@ func sprayRun(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println("\033[H\033[2J")
+		// fmt.Println("\033[H\033[2J")
 		fmt.Println(stats)
 	}
 

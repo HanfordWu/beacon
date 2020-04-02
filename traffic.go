@@ -3,6 +3,7 @@ package beacon
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/gopacket"
@@ -89,6 +90,7 @@ func Boomerang(path Path, tc *TransportChannel, packetBuffer gopacket.SerializeB
 
 		err := tc.SendToPath(packetBuffer.Bytes(), path)
 		if err != nil {
+			fmt.Printf("error in SendToPath: %s\n", err)
 			resultChan <- BoomerangResult{
 				Err:       err,
 				ErrorType: sendError,
