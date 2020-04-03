@@ -3,7 +3,9 @@ package beacon
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net"
+	"strings"
 	"syscall"
 	"time"
 
@@ -15,6 +17,7 @@ import (
 type TransportChannel struct {
 	handle       *pcap.Handle
 	packetSource *gopacket.PacketSource
+	packets      chan gopacket.Packet
 	deviceName   string
 	snaplen      int32
 	filter       string
@@ -84,7 +87,51 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 
 // Rx returns a packet channel over which packets will be pushed onto
 func (tc *TransportChannel) Rx() chan gopacket.Packet {
-	return tc.packetSource.Packets()
+	// return tc.packetSource.Packets()
+	if tc.packets == nil {
+		tc.packets = make(chan gopacket.Packet)
+		go tc.packetsToChannel()
+	}
+	return tc.packets
+}
+
+// packetsToChannel reads in all packets from the packet source and sends them
+// to the given channel. This routine terminates when a non-temporary error
+// is returned by NextPacket().
+func (tc *TransportChannel) packetsToChannel() {
+
+	defer close(tc.packets)
+	for {
+		packet, err := tc.packetSource.NextPacket()
+		if err == nil {
+			tc.packets <- packet
+			continue
+		}
+
+		// Immediately retry for temporary network errors
+		if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
+			fmt.Printf("retrying on a temporary error: %s", nerr)
+			continue
+		}
+
+		// Immediately retry for EAGAIN
+		if err == syscall.EAGAIN {
+			fmt.Printf("EAGAIN: retrying")
+			continue
+		}
+
+		// Immediately break for known unrecoverable errors
+		if err == io.EOF || err == io.ErrUnexpectedEOF ||
+			err == io.ErrNoProgress || err == io.ErrClosedPipe || err == io.ErrShortBuffer ||
+			err == syscall.EBADF ||
+			strings.Contains(err.Error(), "use of closed file") {
+			fmt.Printf("unrecoverable error in reading packet: %s", err)
+			break
+		}
+
+		// Sleep briefly and try again
+		time.Sleep(time.Millisecond * time.Duration(5))
+	}
 }
 
 // RxWithCondition synchronously returns the first packet from the TransportChannel's
@@ -134,6 +181,30 @@ func (tc *TransportChannel) SendToPath(packetData []byte, path Path) error {
 		return errors.New("path must be non-empty")
 	}
 	return tc.SendTo(packetData, path[1])
+}
+
+// Reset resets the transport channel instance
+func (tc *TransportChannel) Reset() error {
+	var handleTimeout time.Duration
+	if tc.timeout != 0 {
+		handleTimeout = time.Duration(tc.timeout) * time.Second
+	} else {
+		handleTimeout = pcap.BlockForever
+	}
+	handle, err := pcap.OpenLive(tc.deviceName, tc.snaplen, true, handleTimeout)
+	if err != nil {
+		return err
+	}
+	tc.handle = handle
+
+	if tc.filter != "" {
+		err = handle.SetBPFFilter(tc.filter)
+		if err != nil {
+			return err
+		}
+	}
+	tc.packetSource = gopacket.NewPacketSource(handle, handle.LinkType())
+	return nil
 }
 
 // Close cleans up resources for the transport channel instance
