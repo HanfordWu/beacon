@@ -20,6 +20,9 @@ func ReverseTraceroute(destIP net.IP) error {
 		beacon.WithBPFFilter("icmp"),
 		beacon.WithInterface(interfaceDevice),
 	)
+	if err != nil {
+		return fmt.Errorf("Error creating transport channel: %s", err)
+	}
 	pc, err := tc.GetPathChannelFrom(destIP)
 	if err != nil {
 		return err
