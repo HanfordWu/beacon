@@ -80,10 +80,9 @@ func sprayRun(cmd *cobra.Command, args []string) error {
 		if result.Err != nil {
 			if result.IsFatal() {
 				return fmt.Errorf("Fatal error while handling boomerang result: %s", result.Err)
-			} else {
-				stats.recordResponse(string(result.Payload), false)
-				return nil
 			}
+			stats.recordResponse(string(result.Payload), false)
+			return nil
 		}
 
 		stats.recordResponse(string(result.Payload), true)
@@ -95,7 +94,7 @@ func sprayRun(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		// fmt.Println("\033[H\033[2J")
+		fmt.Println("\033[H\033[2J")
 		fmt.Println(stats)
 	}
 
