@@ -18,12 +18,12 @@ var timeout int
 var numPackets int
 var hops string
 
-// SprayCmd represents the spray subcommand which allows a user to send
+// ProbeCmd represents the spray subcommand which allows a user to send
 // a spray of packets over a path from source to dest
-var SprayCmd = &cobra.Command{
-	Use:   "spray",
-	Short: "spray packets over a path",
-	Long:  "longer description for spraying packets over a path",
+var ProbeCmd = &cobra.Command{
+	Use:   "probe",
+	Short: "probe a path by generating traffic over it",
+	Long:  "given a path A -> B -> C -> D, generate traffic to/from each hop and measure loss for each",
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		if dest == "" && hops == "" {
 			return errors.New("At least one of destination (-d) or path (-p) must be supplied")
@@ -34,18 +34,18 @@ var SprayCmd = &cobra.Command{
 
 		return nil
 	},
-	RunE: sprayRun,
+	RunE: probeRun,
 }
 
 func initSpray() {
-	SprayCmd.Flags().StringVarP(&source, "source", "s", "", "source IP/host (defaults to eth0 interface)")
-	SprayCmd.Flags().StringVarP(&dest, "dest", "d", "", "destination IP/host (required)")
-	SprayCmd.Flags().IntVarP(&timeout, "timeout", "t", 3, "time (s) to wait on a packet to return")
-	SprayCmd.Flags().IntVarP(&numPackets, "num-packets", "n", 30, "number of packets to spray")
-	SprayCmd.Flags().StringVarP(&hops, "path", "p", "", "manually define a comma separated list of hops to spray")
+	ProbeCmd.Flags().StringVarP(&source, "source", "s", "", "source IP/host (defaults to eth0 interface)")
+	ProbeCmd.Flags().StringVarP(&dest, "dest", "d", "", "destination IP/host (required)")
+	ProbeCmd.Flags().IntVarP(&timeout, "timeout", "t", 3, "time (s) to wait on a packet to return")
+	ProbeCmd.Flags().IntVarP(&numPackets, "num-packets", "n", 30, "number of packets to spray")
+	ProbeCmd.Flags().StringVarP(&hops, "path", "p", "", "manually define a comma separated list of hops to spray")
 }
 
-func sprayRun(cmd *cobra.Command, args []string) error {
+func probeRun(cmd *cobra.Command, args []string) error {
 	var err error
 	var path beacon.Path
 
@@ -71,7 +71,7 @@ func sprayRun(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		resultChannels[i-2] = beacon.Spray(path[0:i], tc, numPackets, timeout)
+		resultChannels[i-2] = beacon.Probe(path[0:i], tc, numPackets, timeout)
 	}
 
 	stats := newSprayStats(path)
@@ -135,12 +135,12 @@ func findPathFromSourceToDest() (beacon.Path, error) {
 	}
 	pathFinderTC.Close()
 
-	// if the caller isn't the host, prepend the host to the path
-	if source != "" {
-		vantageIP, err := pathFinderTC.FindLocalIP()
-		if err != nil {
-			return nil, err
-		}
+	// prepend the host to the path
+	vantageIP, err := pathFinderTC.FindLocalIP()
+	if err != nil {
+		return nil, err
+	}
+	if !(path[0].Equal(vantageIP)) {
 		path = append([]net.IP{vantageIP}, path...)
 	}
 

@@ -35,8 +35,8 @@ func (b *BoomerangResult) IsFatal() bool {
 	return false
 }
 
-// Spray generates traffic over a given path and returns a channel of boomerang results
-func Spray(path Path, tc *TransportChannel, numPackets int, timeout int) chan BoomerangResult {
+// Probe generates traffic over a given path and returns a channel of boomerang results
+func Probe(path Path, tc *TransportChannel, numPackets int, timeout int) chan BoomerangResult {
 	payload := []byte(path[len(path)-1].String())
 	resultChan := make(chan BoomerangResult)
 

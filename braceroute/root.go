@@ -21,7 +21,7 @@ var RootCmd = &cobra.Command{
 func initRoot() {
 	RootCmd.Flags().BoolVarP(&reverse, "reverse", "r", false, "trace the route in reverse from target back to caller")
 	RootCmd.PersistentFlags().StringVarP(&interfaceDevice, "interface", "i", "eth0", "outbound interface to use")
-	RootCmd.AddCommand(SprayCmd)
+	RootCmd.AddCommand(ProbeCmd)
 }
 
 func rootRun(cmd *cobra.Command, args []string) error {

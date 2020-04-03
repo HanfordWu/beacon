@@ -57,14 +57,21 @@ nettools1-co1.phx.gbl. (10.20.30.96)
 ```
 
 ```
-$ braceroute spray -s icr01.par30 -d ibr01.par30
-Finding path from 207.46.33.149 to 25.125.46.50
-[10.20.30.96 207.46.33.149 25.125.33.47 25.125.33.50 25.125.33.42 25.125.46.50]
-207.46.33.149 -> 10.20.30.96
-packet success rate: 1/1, loss: 0.000000%
-timed out waiting for the packet
-packet success rate: 1/2, loss: 50.000000%
-...
+# probe with source dest, using path discovery
+$ braceroute probe -s 13.106.165.195 -d 13.106.165.199
+Finding path from 13.106.165.195 to 13.106.165.199
+[13.106.165.195 13.106.165.194 13.106.81.188 13.106.165.199]
+IDX     HOP             SUCCESS RATE    RX      TX
+1       13.106.165.194  100.000%        30      30
+2       13.106.81.188   100.000%        30      30
+3       13.106.165.199  100.000%        30      30
+
+# probe by supplying an explicit path
+$ braceroute probe -p 13.106.165.195,13.106.165.194,13.106.81.188,13.106.165.199
+IDX     HOP             SUCCESS RATE    RX      TX
+1       13.106.165.194  100.000%        30      30
+2       13.106.81.188   100.000%        30      30
+3       13.106.165.199  100.000%        30      30
 ```
 
 ### Constraints
