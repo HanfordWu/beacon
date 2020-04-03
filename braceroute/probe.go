@@ -135,12 +135,12 @@ func findPathFromSourceToDest() (beacon.Path, error) {
 	}
 	pathFinderTC.Close()
 
-	// if the caller isn't the host, prepend the host to the path
-	if source != "" {
-		vantageIP, err := pathFinderTC.FindLocalIP()
-		if err != nil {
-			return nil, err
-		}
+	// prepend the host to the path
+	vantageIP, err := pathFinderTC.FindLocalIP()
+	if err != nil {
+		return nil, err
+	}
+	if !(path[0].Equal(vantageIP)) {
 		path = append([]net.IP{vantageIP}, path...)
 	}
 
