@@ -7,7 +7,7 @@ import (
 
 func init() {
 	initRoot()
-	initSpray()
+	initProbe()
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

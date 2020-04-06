@@ -18,8 +18,8 @@ var timeout int
 var numPackets int
 var hops string
 
-// ProbeCmd represents the spray subcommand which allows a user to send
-// a spray of packets over a path from source to dest
+// ProbeCmd represents the probe subcommand which allows a user to send
+// a probe of packets over a path from source to dest
 var ProbeCmd = &cobra.Command{
 	Use:   "probe",
 	Short: "probe a path by generating traffic over it",
@@ -37,12 +37,12 @@ var ProbeCmd = &cobra.Command{
 	RunE: probeRun,
 }
 
-func initSpray() {
+func initProbe() {
 	ProbeCmd.Flags().StringVarP(&source, "source", "s", "", "source IP/host (defaults to eth0 interface)")
 	ProbeCmd.Flags().StringVarP(&dest, "dest", "d", "", "destination IP/host (required)")
 	ProbeCmd.Flags().IntVarP(&timeout, "timeout", "t", 3, "time (s) to wait on a packet to return")
-	ProbeCmd.Flags().IntVarP(&numPackets, "num-packets", "n", 30, "number of packets to spray")
-	ProbeCmd.Flags().StringVarP(&hops, "path", "p", "", "manually define a comma separated list of hops to spray")
+	ProbeCmd.Flags().IntVarP(&numPackets, "num-packets", "n", 30, "number of probes to send per hop")
+	ProbeCmd.Flags().StringVarP(&hops, "path", "p", "", "manually define a comma separated list of hops to probe")
 }
 
 func probeRun(cmd *cobra.Command, args []string) error {
@@ -74,7 +74,7 @@ func probeRun(cmd *cobra.Command, args []string) error {
 		resultChannels[i-2] = beacon.Probe(path[0:i], tc, numPackets, timeout)
 	}
 
-	stats := newSprayStats(path)
+	stats := newProbeStats(path)
 
 	handleResult := func(result beacon.BoomerangResult) error {
 		if result.Err != nil {
