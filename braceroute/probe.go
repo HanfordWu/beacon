@@ -24,16 +24,7 @@ var ProbeCmd = &cobra.Command{
 	Use:   "probe",
 	Short: "probe a path by generating traffic over it",
 	Long:  "given a path A -> B -> C -> D, generate traffic to/from each hop and measure loss for each",
-	PreRunE: func(cmd *cobra.Command, args []string) error {
-		if dest == "" && hops == "" {
-			return errors.New("At least one of destination (-d) or path (-p) must be supplied")
-		}
-		if dest != "" && hops != "" {
-			return errors.New("Both destination (-d) and path (-p) cannot be supplied")
-		}
-
-		return nil
-	},
+	PreRunE: probePreRun,
 	RunE: probeRun,
 }
 
@@ -43,6 +34,22 @@ func initProbe() {
 	ProbeCmd.Flags().IntVarP(&timeout, "timeout", "t", 3, "time (s) to wait on a packet to return")
 	ProbeCmd.Flags().IntVarP(&numPackets, "num-packets", "n", 30, "number of probes to send per hop")
 	ProbeCmd.Flags().StringVarP(&hops, "path", "p", "", "manually define a comma separated list of hops to probe")
+}
+
+func probePreRun(cmd *cobra.Command, args []string) error {
+	if dest == "" && hops == "" {
+		return errors.New("At least one of destination (-d) or path (-p) must be supplied")
+	} else if dest != "" && hops != "" {
+		return errors.New("Both destination (-d) and path (-p) cannot be supplied")
+	} else if dest != "" && hops == "" {
+		interfaceDeviceName, err := beacon.GetInterfaceDeviceFromDestString(dest)
+		if err != nil {
+			return err
+		}
+		interfaceDevice = interfaceDeviceName
+	}
+
+	return nil
 }
 
 func probeRun(cmd *cobra.Command, args []string) error {
