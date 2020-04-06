@@ -42,11 +42,13 @@ func probePreRun(cmd *cobra.Command, args []string) error {
 	} else if dest != "" && hops != "" {
 		return errors.New("Both destination (-d) and path (-p) cannot be supplied")
 	} else if dest != "" && hops == "" {
-		interfaceDeviceName, err := beacon.GetInterfaceDeviceFromDestString(dest)
-		if err != nil {
-			return err
+		if interfaceDevice == "" {
+			interfaceDeviceName, err := beacon.GetInterfaceDeviceFromDestString(dest)
+			if err != nil {
+				return err
+			}
+			interfaceDevice = interfaceDeviceName
 		}
-		interfaceDevice = interfaceDeviceName
 	}
 
 	return nil
