@@ -53,7 +53,6 @@ func WithTimeout(timeout int) TransportChannelOption {
 // NewTransportChannel instantiates a new transport chanel
 func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, error) {
 	tc := &TransportChannel{
-		deviceName: eth0DeviceName,
 		snaplen:    1600,
 		filter:     "",
 	}

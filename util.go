@@ -5,10 +5,11 @@ import (
 	"net"
 
 	"github.com/google/gopacket/pcap"
+	"github.com/google/gopacket/routing"
 )
 
-// FindLocalIP finds the IP address assigned to the interface "eth0"
-func FindLocalIP() (net.IP, error) {
+// FindLocalIP finds the IP address assigned to the supplied interface
+func FindLocalIP(interfaceName string) (net.IP, error) {
 	devices, err := pcap.FindAllDevs()
 	if err != nil {
 		return nil, err
@@ -17,13 +18,13 @@ func FindLocalIP() (net.IP, error) {
 	var eth0Device pcap.Interface
 	deviceFound := false
 	for _, device := range devices {
-		if device.Name == eth0DeviceName {
+		if device.Name == interfaceName {
 			deviceFound = true
 			eth0Device = device
 		}
 	}
 	if !deviceFound {
-		log.Fatalf("Couldn't find a device named %s, or it did not have any addresses assigned to it", eth0DeviceName)
+		log.Fatalf("Couldn't find a device named %s, or it did not have any addresses assigned to it", interfaceName)
 	}
 
 	return eth0Device.Addresses[0].IP, nil
