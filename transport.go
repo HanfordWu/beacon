@@ -109,13 +109,11 @@ func (tc *TransportChannel) packetsToChannel() {
 
 		// Immediately retry for temporary network errors
 		if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
-			fmt.Printf("retrying on a temporary error: %s", nerr)
 			continue
 		}
 
 		// Immediately retry for EAGAIN
 		if err == syscall.EAGAIN {
-			fmt.Printf("EAGAIN: retrying")
 			continue
 		}
 
@@ -124,7 +122,6 @@ func (tc *TransportChannel) packetsToChannel() {
 			err == io.ErrNoProgress || err == io.ErrClosedPipe || err == io.ErrShortBuffer ||
 			err == syscall.EBADF ||
 			strings.Contains(err.Error(), "use of closed file") {
-			fmt.Printf("unrecoverable error in reading packet: %s", err)
 			break
 		}
 
