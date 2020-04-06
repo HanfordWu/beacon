@@ -16,6 +16,13 @@ func Traceroute(destIP net.IP) error {
 		fmt.Printf("Doing traceroute to %s (%s)\n", destHostname[0], destIP)
 	}
 
+	discoveredOutboundInterface, err := beacon.GetInterfaceDeviceFromDestIP(destIP)
+	if err != nil {
+		return fmt.Errorf("Failed to find an interface for destination: %s, explicitly provide an interface with -i", destIP.String())
+	}
+
+	interfaceDevice = discoveredOutboundInterface
+
 	tc, err := beacon.NewTransportChannel(
 		beacon.WithBPFFilter("icmp"),
 		beacon.WithInterface(interfaceDevice),

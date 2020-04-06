@@ -44,3 +44,29 @@ func ParseIPFromString(s string) (net.IP, error) {
 
 	return ipAddrs[0], nil
 }
+
+// GetInterfaceDeviceFromDestString uses gopacket's routing package to attempt to
+// resolve the appropriate outbound interface to use given a destination string
+func GetInterfaceDeviceFromDestString(dest string) (string, error) {
+	destIP, err := ParseIPFromString(dest)
+	if err != nil {
+		return "", err
+	}
+
+	return GetInterfaceDeviceFromDestIP(destIP)
+}
+
+// GetInterfaceDeviceFromDestIP uses gopacket's routing package to attempt to
+// resolve the appropriate outbound interface to use given a destination IP
+func GetInterfaceDeviceFromDestIP(destIP net.IP) (string, error) {
+	router, err := routing.New()
+	if err != nil {
+		return "", err
+	}
+	iface, _, _, err := router.Route(destIP)
+	if err != nil {
+		return "", err
+	}
+
+	return iface.Name, nil
+}
