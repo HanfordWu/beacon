@@ -11,7 +11,7 @@ import (
 	"github.com/olekukonko/tablewriter"
 )
 
-type sprayStats struct {
+type probeStats struct {
 	sync.RWMutex
 	path            beacon.Path
 	source          string
@@ -20,8 +20,8 @@ type sprayStats struct {
 	hopStatSlice    []hopStats
 }
 
-func newSprayStats(path beacon.Path) *sprayStats {
-	s := sprayStats{
+func newProbeStats(path beacon.Path) *probeStats {
+	s := probeStats{
 		path:            path,
 		source:          path[0].String(),
 		dest:            path[len(path)-1].String(),
@@ -37,7 +37,7 @@ func newSprayStats(path beacon.Path) *sprayStats {
 	return &s
 }
 
-func (s *sprayStats) recordResponse(hop string, successful bool) {
+func (s *probeStats) recordResponse(hop string, successful bool) {
 	s.Lock()
 	if successful {
 		idx := s.hopToIdxMapping[hop]
@@ -49,15 +49,12 @@ func (s *sprayStats) recordResponse(hop string, successful bool) {
 	s.Unlock()
 }
 
-func (s *sprayStats) String() string {
-	// header := fmt.Sprintf("Spray from %s to %s", s.source, s.dest)
-	// columnNames := fmt.Sprintf("idx   hop        success rate         rx     tx")
+func (s *probeStats) String() string {
 	tableString := &strings.Builder{}
 	table := tablewriter.NewWriter(tableString)
 
 	rows := make([][]string, len(s.path)-1)
 	for idx, hopStats := range s.hopStatSlice {
-		// rows[idx] = fmt.Sprintf("%d - %s    %3f%%        %d     %d", idx+1, hopStats.name, hopStats.calculateSuccessRate(), hopStats.packetsRecvd, hopStats.packetsSent)
 		rows[idx] = []string{
 			fmt.Sprintf("%d", idx+1),
 			hopStats.name,
@@ -67,11 +64,6 @@ func (s *sprayStats) String() string {
 		}
 	}
 
-	/*
-		outputRows := append([]string{header, columnNames}, rows...)
-
-		return strings.Join(outputRows, "\n")
-	*/
 	table.SetHeader([]string{"idx", "hop", "success rate", "rx", "tx"})
 	table.SetAutoWrapText(false)
 	table.SetAutoFormatHeaders(true)
