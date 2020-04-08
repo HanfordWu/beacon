@@ -77,10 +77,12 @@ func Probe(path Path, tc *TransportChannel, numPackets int, timeout int) chan Bo
 // Boomerang sends one packet which "boomerangs" over a given path.  For example, if the path is A,B,C,D the packet will travel
 // A -> B -> C -> D -> C -> B -> A
 func Boomerang(path Path, tc *TransportChannel, packetBuffer gopacket.SerializeBuffer, payload []byte, timeout int) BoomerangResult {
+	listenerReady := make(chan bool)
 	seen := make(chan BoomerangResult)
 	resultChan := make(chan BoomerangResult)
 
 	go func() {
+		listenerReady <- true
 		for packet := range tc.Rx() {
 			udpLayer := packet.Layer(layers.LayerTypeUDP)
 			ipv4Layer := packet.Layer(layers.LayerTypeIPv4)
@@ -97,6 +99,8 @@ func Boomerang(path Path, tc *TransportChannel, packetBuffer gopacket.SerializeB
 	}()
 
 	go func() {
+		<- listenerReady
+
 		timeOutDuration := time.Duration(timeout) * time.Second
 		timer := time.NewTimer(timeOutDuration)
 
