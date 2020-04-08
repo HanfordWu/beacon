@@ -84,7 +84,7 @@ func probeRun(cmd *cobra.Command, args []string) error {
 		resultChannels[i-2] = beacon.Probe(path[0:i], tc, numPackets, timeout)
 	}
 
-	stats := newProbeStats(path)
+	stats := newProbeStats(path, numPackets, interfaceDevice)
 
 	handleResult := func(result beacon.BoomerangResult) error {
 		if result.Err != nil {
