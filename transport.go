@@ -63,7 +63,7 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 
 	var handleTimeout time.Duration
 	if tc.timeout != 0 {
-		handleTimeout = time.Duration(tc.timeout) * time.Second
+		handleTimeout = time.Duration(tc.timeout) * time.Millisecond
 	} else {
 		handleTimeout = pcap.BlockForever
 	}

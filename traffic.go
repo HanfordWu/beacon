@@ -55,10 +55,11 @@ func Probe(path Path, tc *TransportChannel, numPackets int, timeout int) chan Bo
 		for i := 1; i <= numPackets; i++ {
 			result := Boomerang(path, tc, buf, payload, timeout)
 			if result.Err != nil && (result.ErrorType == timedOut || result.ErrorType == sendError) {
-				// tc.Close()
+				go tc.Close()
 				tc, err = NewTransportChannel(
 					WithBPFFilter(tc.filter),
 					WithInterface(tc.deviceName),
+					WithTimeout(tc.timeout),
 				)
 				if err != nil {
 					resultChan <- BoomerangResult{

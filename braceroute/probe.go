@@ -76,6 +76,7 @@ func probeRun(cmd *cobra.Command, args []string) error {
 		tc, err := beacon.NewTransportChannel(
 			beacon.WithBPFFilter("ip proto 4"),
 			beacon.WithInterface(interfaceDevice),
+			beacon.WithTimeout(100),
 		)
 		if err != nil {
 			return err
