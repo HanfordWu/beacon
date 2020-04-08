@@ -29,10 +29,7 @@ const (
 
 // IsFatal returns true if the error is fatal, otherwise returns false
 func (b *BoomerangResult) IsFatal() bool {
-	if b.ErrorType == fatal {
-		return true
-	}
-	return false
+	return b.ErrorType == fatal
 }
 
 // Probe generates traffic over a given path and returns a channel of boomerang results
