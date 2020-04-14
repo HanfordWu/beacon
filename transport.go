@@ -62,11 +62,16 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 	}
 
 	var handleTimeout time.Duration
+
+    /* // commented out as handle timeout should not be proportional to packet rx deadline
 	if tc.timeout != 0 {
 		handleTimeout = time.Duration(tc.timeout) * time.Millisecond
 	} else {
 		handleTimeout = pcap.BlockForever
 	}
+    */
+    handleTimeout = 4 * time.Millisecond
+
 	handle, err := pcap.OpenLive(tc.deviceName, tc.snaplen, true, handleTimeout)
 	if err != nil {
 		return nil, err
