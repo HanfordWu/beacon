@@ -1,8 +1,8 @@
 package beacon
 
 import (
-	"errors"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -25,14 +25,14 @@ type BoomerangResult struct {
 // this struct is designed to be JSON unmarshalled from the IP payload in the boomerang packet
 type BoomerangPayload struct {
 	DestIP net.IP
-	id   string
+	id     string
 }
 
 // NewBoomerangPayload constructs a BoomerangPayload struct
 func NewBoomerangPayload(destIP net.IP, id string) *BoomerangPayload {
 	return &BoomerangPayload{
 		DestIP: destIP,
-		id: id,
+		id:     id,
 	}
 
 }
@@ -143,7 +143,7 @@ func Boomerang(path Path, tc *TransportChannel, timeout int) BoomerangResult {
 			resultChan <- BoomerangResult{
 				Err:       err,
 				ErrorType: sendError,
-				Payload:   BoomerangPayload{
+				Payload: BoomerangPayload{
 					DestIP: path[len(path)-1],
 				},
 			}
@@ -155,7 +155,7 @@ func Boomerang(path Path, tc *TransportChannel, timeout int) BoomerangResult {
 			resultChan <- result
 		case <-timer.C:
 			resultChan <- BoomerangResult{
-				Payload:   BoomerangPayload{
+				Payload: BoomerangPayload{
 					DestIP: path[len(path)-1],
 				},
 				Err:       errors.New("timed out waiting for packet from " + path[len(path)-1].String()),
