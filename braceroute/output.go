@@ -18,15 +18,19 @@ type probeStats struct {
 	dest            string
 	hopToIdxMapping map[string]int
 	hopStatSlice    []hopStats
+	totalPackets    int
+	interfaceDevice string
 }
 
-func newProbeStats(path beacon.Path) *probeStats {
+func newProbeStats(path beacon.Path, totalPackets int, interfaceDevice string) *probeStats {
 	s := probeStats{
 		path:            path,
 		source:          path[0].String(),
 		dest:            path[len(path)-1].String(),
 		hopToIdxMapping: make(map[string]int),
 		hopStatSlice:    make([]hopStats, len(path)-1),
+		totalPackets:    totalPackets,
+		interfaceDevice: interfaceDevice,
 	}
 
 	for idx, hop := range path[1:] {
@@ -51,6 +55,8 @@ func (s *probeStats) recordResponse(hop string, successful bool) {
 
 func (s *probeStats) String() string {
 	tableString := &strings.Builder{}
+	tableString.WriteString(fmt.Sprintf("Probe %d packets through interface %s over path %v\n\n", s.totalPackets, s.interfaceDevice, s.path))
+
 	table := tablewriter.NewWriter(tableString)
 
 	rows := make([][]string, len(s.path)-1)

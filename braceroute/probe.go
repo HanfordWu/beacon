@@ -21,11 +21,11 @@ var hops string
 // ProbeCmd represents the probe subcommand which allows a user to send
 // a probe of packets over a path from source to dest
 var ProbeCmd = &cobra.Command{
-	Use:   "probe",
-	Short: "probe a path by generating traffic over it",
-	Long:  "given a path A -> B -> C -> D, generate traffic to/from each hop and measure loss for each",
+	Use:     "probe",
+	Short:   "probe a path by generating traffic over it",
+	Long:    "given a path A -> B -> C -> D, generate traffic to/from each hop and measure loss for each",
 	PreRunE: probePreRun,
-	RunE: probeRun,
+	RunE:    probeRun,
 }
 
 func initProbe() {
@@ -76,6 +76,7 @@ func probeRun(cmd *cobra.Command, args []string) error {
 		tc, err := beacon.NewTransportChannel(
 			beacon.WithBPFFilter("ip proto 4"),
 			beacon.WithInterface(interfaceDevice),
+			beacon.WithTimeout(100),
 		)
 		if err != nil {
 			return err
@@ -83,7 +84,7 @@ func probeRun(cmd *cobra.Command, args []string) error {
 		resultChannels[i-2] = beacon.Probe(path[0:i], tc, numPackets, timeout)
 	}
 
-	stats := newProbeStats(path)
+	stats := newProbeStats(path, numPackets, interfaceDevice)
 
 	handleResult := func(result beacon.BoomerangResult) error {
 		if result.Err != nil {
