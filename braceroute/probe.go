@@ -91,11 +91,11 @@ func probeRun(cmd *cobra.Command, args []string) error {
 			if result.IsFatal() {
 				return fmt.Errorf("Fatal error while handling boomerang result: %s", result.Err)
 			}
-			stats.recordResponse(string(result.Payload), false)
+			stats.recordResponse(string(result.Payload.DestIP), false)
 			return nil
 		}
 
-		stats.recordResponse(string(result.Payload), true)
+		stats.recordResponse(string(result.Payload.DestIP), true)
 		return nil
 	}
 
