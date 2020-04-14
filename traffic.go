@@ -1,13 +1,16 @@
 package beacon
 
 import (
-	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
+	"net"
 	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/google/uuid"
 )
 
 // BoomerangResult represents the completion of one run of boomerang, contains information about potential errors
@@ -15,7 +18,23 @@ import (
 type BoomerangResult struct {
 	Err       error
 	ErrorType BoomerangErrorType
-	Payload   string
+	Payload   BoomerangPayload
+}
+
+// BoomerangPayload is a field of BoomerangResult which is only populated when the BoomerangResult did not encounter an error
+// this struct is designed to be JSON unmarshalled from the IP payload in the boomerang packet
+type BoomerangPayload struct {
+	DestIP net.IP
+	ID     string
+}
+
+// NewBoomerangPayload constructs a BoomerangPayload struct
+func NewBoomerangPayload(destIP net.IP, id string) *BoomerangPayload {
+	return &BoomerangPayload{
+		DestIP: destIP,
+		ID:     id,
+	}
+
 }
 
 // BoomerangErrorType is an enum of possible errors encountered during a run of boomerang
@@ -34,23 +53,12 @@ func (b *BoomerangResult) IsFatal() bool {
 
 // Probe generates traffic over a given path and returns a channel of boomerang results
 func Probe(path Path, tc *TransportChannel, numPackets int, timeout int) chan BoomerangResult {
-	payload := []byte(path[len(path)-1].String())
 	resultChan := make(chan BoomerangResult)
-
-	buf := gopacket.NewSerializeBuffer()
-	err := CreateRoundTripPacketForPath(path, payload, buf)
-	if err != nil {
-		resultChan <- BoomerangResult{
-			Err:       err,
-			ErrorType: fatal,
-		}
-
-		return resultChan
-	}
+	var err error
 
 	go func() {
 		for i := 1; i <= numPackets; i++ {
-			result := Boomerang(path, tc, buf, payload, timeout)
+			result := Boomerang(path, tc, timeout)
 			if result.Err != nil && (result.ErrorType == timedOut || result.ErrorType == sendError) {
 				go tc.Close()
 				tc, err = NewTransportChannel(
@@ -76,10 +84,29 @@ func Probe(path Path, tc *TransportChannel, numPackets int, timeout int) chan Bo
 
 // Boomerang sends one packet which "boomerangs" over a given path.  For example, if the path is A,B,C,D the packet will travel
 // A -> B -> C -> D -> C -> B -> A
-func Boomerang(path Path, tc *TransportChannel, packetBuffer gopacket.SerializeBuffer, payload []byte, timeout int) BoomerangResult {
+func Boomerang(path Path, tc *TransportChannel, timeout int) BoomerangResult {
 	listenerReady := make(chan bool)
 	seen := make(chan BoomerangResult)
 	resultChan := make(chan BoomerangResult)
+
+	destHop := path[len(path)-1]
+	id := uuid.New().String()
+	payload, err := json.Marshal(NewBoomerangPayload(destHop, id))
+	if err != nil {
+		return BoomerangResult{
+			Err:       err,
+			ErrorType: fatal,
+		}
+	}
+
+	buf := gopacket.NewSerializeBuffer()
+	err = CreateRoundTripPacketForPath(path, payload, buf)
+	if err != nil {
+		return BoomerangResult{
+			Err:       err,
+			ErrorType: fatal,
+		}
+	}
 
 	go func() {
 		listenerReady <- true
@@ -89,11 +116,19 @@ func Boomerang(path Path, tc *TransportChannel, packetBuffer gopacket.SerializeB
 			udp, _ := udpLayer.(*layers.UDP)
 			ip4, _ := ipv4Layer.(*layers.IPv4)
 
-			if ip4.DstIP.Equal(path[0]) && ip4.SrcIP.Equal(path[1]) && bytes.Equal(udp.Payload, payload) {
-				seen <- BoomerangResult{
-					Payload: string(udp.Payload),
+			if ip4.DstIP.Equal(path[0]) && ip4.SrcIP.Equal(path[1]) {
+				payload := &BoomerangPayload{}
+				err := json.Unmarshal(udp.Payload, payload)
+				if err != nil {
+					log.Printf("error unmarshalling payload: %s", err)
+					continue
 				}
-				return
+				if payload.ID == id {
+					seen <- BoomerangResult{
+						Payload: *payload,
+					}
+					return
+				}
 			}
 		}
 	}()
@@ -104,13 +139,15 @@ func Boomerang(path Path, tc *TransportChannel, packetBuffer gopacket.SerializeB
 		timeOutDuration := time.Duration(timeout) * time.Second
 		timer := time.NewTimer(timeOutDuration)
 
-		err := tc.SendToPath(packetBuffer.Bytes(), path)
+		err := tc.SendToPath(buf.Bytes(), path)
 		if err != nil {
 			fmt.Printf("error in SendToPath: %s\n", err)
 			resultChan <- BoomerangResult{
 				Err:       err,
 				ErrorType: sendError,
-				Payload:   path[len(path)-1].String(),
+				Payload: BoomerangPayload{
+					DestIP: path[len(path)-1],
+				},
 			}
 			return
 		}
@@ -120,7 +157,9 @@ func Boomerang(path Path, tc *TransportChannel, packetBuffer gopacket.SerializeB
 			resultChan <- result
 		case <-timer.C:
 			resultChan <- BoomerangResult{
-				Payload:   path[len(path)-1].String(),
+				Payload: BoomerangPayload{
+					DestIP: path[len(path)-1],
+				},
 				Err:       errors.New("timed out waiting for packet from " + path[len(path)-1].String()),
 				ErrorType: timedOut,
 			}
