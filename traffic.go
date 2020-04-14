@@ -99,7 +99,7 @@ func Boomerang(path Path, tc *TransportChannel, packetBuffer gopacket.SerializeB
 	}()
 
 	go func() {
-		<- listenerReady
+		<-listenerReady
 
 		timeOutDuration := time.Duration(timeout) * time.Second
 		timer := time.NewTimer(timeOutDuration)

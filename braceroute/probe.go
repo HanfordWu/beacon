@@ -21,11 +21,11 @@ var hops string
 // ProbeCmd represents the probe subcommand which allows a user to send
 // a probe of packets over a path from source to dest
 var ProbeCmd = &cobra.Command{
-	Use:   "probe",
-	Short: "probe a path by generating traffic over it",
-	Long:  "given a path A -> B -> C -> D, generate traffic to/from each hop and measure loss for each",
+	Use:     "probe",
+	Short:   "probe a path by generating traffic over it",
+	Long:    "given a path A -> B -> C -> D, generate traffic to/from each hop and measure loss for each",
 	PreRunE: probePreRun,
-	RunE: probeRun,
+	RunE:    probeRun,
 }
 
 func initProbe() {
