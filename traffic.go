@@ -123,10 +123,12 @@ func Boomerang(path Path, tc *TransportChannel, timeout int) BoomerangResult {
 					log.Printf("error unmarshalling payload: %s", err)
 					continue
 				}
-				seen <- BoomerangResult{
-					Payload: *payload,
+				if payload.id == id {
+					seen <- BoomerangResult{
+						Payload: *payload,
+					}
+					return
 				}
-				return
 			}
 		}
 	}()
