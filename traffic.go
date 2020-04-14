@@ -25,14 +25,14 @@ type BoomerangResult struct {
 // this struct is designed to be JSON unmarshalled from the IP payload in the boomerang packet
 type BoomerangPayload struct {
 	DestIP net.IP
-	id     string
+	ID     string
 }
 
 // NewBoomerangPayload constructs a BoomerangPayload struct
 func NewBoomerangPayload(destIP net.IP, id string) *BoomerangPayload {
 	return &BoomerangPayload{
 		DestIP: destIP,
-		id:     id,
+		ID:     id,
 	}
 
 }
@@ -123,7 +123,7 @@ func Boomerang(path Path, tc *TransportChannel, timeout int) BoomerangResult {
 					log.Printf("error unmarshalling payload: %s", err)
 					continue
 				}
-				if payload.id == id {
+				if payload.ID == id {
 					seen <- BoomerangResult{
 						Payload: *payload,
 					}
