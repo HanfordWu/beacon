@@ -71,19 +71,6 @@ func probeRun(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("%v\n", path)
 
-	resultChannels := make([]chan beacon.BoomerangResult, len(path)-1)
-	for i := 2; i <= len(path); i++ {
-		tc, err := beacon.NewTransportChannel(
-			beacon.WithBPFFilter("ip proto 4"),
-			beacon.WithInterface(interfaceDevice),
-			beacon.WithTimeout(100),
-		)
-		if err != nil {
-			return err
-		}
-		resultChannels[i-2] = beacon.Probe(path[0:i], tc, numPackets, timeout)
-	}
-
 	stats := newProbeStats(path, numPackets, interfaceDevice)
 
 	handleResult := func(result beacon.BoomerangResult) error {
@@ -99,7 +86,7 @@ func probeRun(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	for res := range merge(resultChannels...) {
+	for res := range beacon.ProbeEachHopOfPath(path, interfaceDevice, numPackets, timeout) {
 		err := handleResult(res)
 		if err != nil {
 			return err

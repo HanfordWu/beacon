@@ -50,6 +50,29 @@ func (b *BoomerangResult) IsFatal() bool {
 	return b.ErrorType == fatal
 }
 
+// ProbeEachHopOfPath accepts a path and some configuration variables, and returns a merged channel where results
+// from every hop are pushed onto
+// if errors are encountered while creating the transport channel, a fatal BoomerangResult will be pushed over the
+// returned channel
+func ProbeEachHopOfPath(path Path, interfaceDevice string, numPackets int, timeout int) <-chan BoomerangResult {
+	resultChannels := make([]chan BoomerangResult, len(path)-1)
+	for i := 2; i <= len(path); i++ {
+		tc, err := NewTransportChannel(
+			WithBPFFilter("ip proto 4"),
+			WithInterface(interfaceDevice),
+			WithTimeout(100),
+		)
+		if err != nil {
+			resultChan := make(chan BoomerangResult)
+			resultChan <- BoomerangResult{Err: err, ErrorType: fatal}
+			return resultChan
+		}
+		resultChannels[i-2] = Probe(path[0:i], tc, numPackets, timeout)
+	}
+
+	return merge(resultChannels...)
+}
+
 // Probe generates traffic over a given path and returns a channel of boomerang results
 func Probe(path Path, tc *TransportChannel, numPackets int, timeout int) chan BoomerangResult {
 	resultChan := make(chan BoomerangResult)

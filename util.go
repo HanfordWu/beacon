@@ -2,6 +2,7 @@ package beacon
 
 import (
 	"net"
+	"sync"
 
 	"github.com/google/gopacket/routing"
 )
@@ -46,4 +47,28 @@ func GetInterfaceDeviceFromDestIP(destIP net.IP) (string, error) {
 	}
 
 	return iface.Name, nil
+}
+
+func merge(resultChannels ...chan BoomerangResult) <-chan BoomerangResult {
+	var wg sync.WaitGroup
+	resultChannel := make(chan BoomerangResult)
+
+	drain := func(c chan BoomerangResult) {
+		for res := range c {
+			resultChannel <- res
+		}
+		wg.Done()
+	}
+
+	wg.Add(len(resultChannels))
+	for _, c := range resultChannels {
+		go drain(c)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChannel)
+	}()
+
+	return resultChannel
 }
