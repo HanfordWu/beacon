@@ -117,15 +117,14 @@ func Boomerang(path Path, tc *TransportChannel, timeout int) BoomerangResult {
 			ip4, _ := ipv4Layer.(*layers.IPv4)
 
 			if ip4.DstIP.Equal(path[0]) && ip4.SrcIP.Equal(path[1]) {
-				payload := &BoomerangPayload{}
-				err := json.Unmarshal(udp.Payload, payload)
+				unmarshalledPayload := &BoomerangPayload{}
+				err := json.Unmarshal(udp.Payload, unmarshalledPayload)
 				if err != nil {
-					log.Printf("error unmarshalling payload: %s", err)
 					continue
 				}
-				if payload.ID == id {
+				if unmarshalledPayload.ID == id {
 					seen <- BoomerangResult{
-						Payload: *payload,
+						Payload: *unmarshalledPayload,
 					}
 					return
 				}
