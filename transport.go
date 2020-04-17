@@ -61,11 +61,19 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 		opt(tc)
 	}
 
-	var handleTimeout time.Duration
+	inactive, err := pcap.NewInactiveHandle(tc.deviceName)
+	if err != nil {
+		return nil, err
+	}
+	defer inactive.CleanUp()
 
-	handleTimeout = 4 * time.Millisecond
+	if err := inactive.SetImmediateMode(true); err != nil {
+		return nil, err
+	} else if err := inactive.SetSnapLen(4800); err != nil {
+		return nil, err
+	}
 
-	handle, err := pcap.OpenLive(tc.deviceName, tc.snaplen, true, handleTimeout)
+	handle, err := inactive.Activate()
 	if err != nil {
 		return nil, err
 	}
