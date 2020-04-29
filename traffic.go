@@ -191,7 +191,7 @@ func Boomerang(path Path, tc *TransportChannel, timeout int) BoomerangResult {
 				}
 
 				if unmarshalledPayload.ID == id {
-					unmarshalledPayload.RxTimestamp = time.Now()
+					unmarshalledPayload.RxTimestamp = time.Now().UTC()
 					seen <- BoomerangResult{
 						Payload: *unmarshalledPayload,
 					}
@@ -207,7 +207,7 @@ func Boomerang(path Path, tc *TransportChannel, timeout int) BoomerangResult {
 		timeOutDuration := time.Duration(timeout) * time.Second
 		timer := time.NewTimer(timeOutDuration)
 
-		txTime := time.Now()
+		txTime := time.Now().UTC()
 		err := tc.SendToPath(buf.Bytes(), path)
 		if err != nil {
 			fmt.Printf("error in SendToPath: %s\n", err)
