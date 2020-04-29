@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/google/gopacket"
@@ -71,6 +72,46 @@ func ProbeEachHopOfPath(path Path, interfaceDevice string, numPackets int, timeo
 	}
 
 	return merge(resultChannels...)
+}
+
+// ProbeEachHopOfPathSync synchronously probes each hop in a path.  That is, it waits for each round of packets to come
+// back from each hop before sending the next round
+func ProbeEachHopOfPathSync(path Path, interfaceDevice string, numPackets int, timeout int) <-chan BoomerangResult {
+	resultChan := make(chan BoomerangResult)
+
+	transportChannels := make([]*TransportChannel, len(path)-1)
+
+	// initialize transport channels
+	for i := 2; i <= len(path); i++ {
+		tc, err := NewTransportChannel(
+			WithBPFFilter("ip proto 4"),
+			WithInterface(interfaceDevice),
+			WithTimeout(100),
+		)
+		if err != nil {
+			resultChan <- BoomerangResult{Err: err, ErrorType: fatal}
+			return resultChan
+		}
+		transportChannels[i-2] = tc
+	}
+
+	go func(p Path) {
+		defer close(resultChan)
+		for packetCount := 1; packetCount <= numPackets; packetCount++ {
+			var wg sync.WaitGroup
+			wg.Add(len(path) - 1)
+
+			fmt.Println(p)
+			for i := 2; i <= len(p); i++ {
+				resultChan <- Boomerang(path[0:i], transportChannels[i-2], timeout)
+				wg.Done()
+			}
+
+			wg.Wait()
+		}
+	}(path)
+
+	return resultChan
 }
 
 // Probe generates traffic over a given path and returns a channel of boomerang results
