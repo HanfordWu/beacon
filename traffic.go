@@ -24,8 +24,10 @@ type BoomerangResult struct {
 // BoomerangPayload is a field of BoomerangResult which is only populated when the BoomerangResult did not encounter an error
 // this struct is designed to be JSON unmarshalled from the IP payload in the boomerang packet
 type BoomerangPayload struct {
-	DestIP net.IP
-	ID     string
+	DestIP      net.IP
+	ID          string
+	TxTimestamp time.Time
+	RxTimestamp time.Time
 }
 
 // NewBoomerangPayload constructs a BoomerangPayload struct
@@ -187,7 +189,9 @@ func Boomerang(path Path, tc *TransportChannel, timeout int) BoomerangResult {
 				if err != nil {
 					continue
 				}
+
 				if unmarshalledPayload.ID == id {
+					unmarshalledPayload.RxTimestamp = time.Now()
 					seen <- BoomerangResult{
 						Payload: *unmarshalledPayload,
 					}
@@ -203,6 +207,7 @@ func Boomerang(path Path, tc *TransportChannel, timeout int) BoomerangResult {
 		timeOutDuration := time.Duration(timeout) * time.Second
 		timer := time.NewTimer(timeOutDuration)
 
+		txTime := time.Now()
 		err := tc.SendToPath(buf.Bytes(), path)
 		if err != nil {
 			fmt.Printf("error in SendToPath: %s\n", err)
@@ -218,6 +223,7 @@ func Boomerang(path Path, tc *TransportChannel, timeout int) BoomerangResult {
 
 		select {
 		case result := <-seen:
+			result.Payload.TxTimestamp = txTime
 			resultChan <- result
 		case <-timer.C:
 			resultChan <- BoomerangResult{
