@@ -95,21 +95,23 @@ func ProbeEachHopOfPathSync(path Path, interfaceDevice string, numPackets int, t
 		transportChannels[i-2] = tc
 	}
 
-	go func(p Path) {
+	go func() {
 		defer close(resultChan)
 		for packetCount := 1; packetCount <= numPackets; packetCount++ {
 			var wg sync.WaitGroup
 			wg.Add(len(path) - 1)
 
-			fmt.Println(p)
-			for i := 2; i <= len(p); i++ {
-				resultChan <- Boomerang(path[0:i], transportChannels[i-2], timeout)
-				wg.Done()
+			for i := 2; i <= len(path); i++ {
+				go func(idx int) {
+					resultChan <- Boomerang(path[0:idx], transportChannels[idx-2], timeout)
+					wg.Done()
+				}(i)
 			}
 
 			wg.Wait()
+			time.Sleep(time.Duration(timeout) * time.Second)
 		}
-	}(path)
+	}()
 
 	return resultChan
 }
