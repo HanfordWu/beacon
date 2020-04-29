@@ -61,18 +61,19 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 		opt(tc)
 	}
 
-	var handleTimeout time.Duration
-
-	/* // commented out as handle timeout should not be proportional to packet rx deadline
-	if tc.timeout != 0 {
-		handleTimeout = time.Duration(tc.timeout) * time.Millisecond
-	} else {
-		handleTimeout = pcap.BlockForever
+	inactive, err := pcap.NewInactiveHandle(tc.deviceName)
+	if err != nil {
+		return nil, err
 	}
-	*/
-	handleTimeout = 4 * time.Millisecond
+	defer inactive.CleanUp()
 
-	handle, err := pcap.OpenLive(tc.deviceName, tc.snaplen, true, handleTimeout)
+	if err := inactive.SetImmediateMode(true); err != nil {
+		return nil, err
+	} else if err := inactive.SetSnapLen(4800); err != nil {
+		return nil, err
+	}
+
+	handle, err := inactive.Activate()
 	if err != nil {
 		return nil, err
 	}
@@ -182,30 +183,6 @@ func (tc *TransportChannel) SendToPath(packetData []byte, path Path) error {
 		return errors.New("path must be non-empty")
 	}
 	return tc.SendTo(packetData, path[1])
-}
-
-// Reset resets the transport channel instance
-func (tc *TransportChannel) Reset() error {
-	var handleTimeout time.Duration
-	if tc.timeout != 0 {
-		handleTimeout = time.Duration(tc.timeout) * time.Second
-	} else {
-		handleTimeout = pcap.BlockForever
-	}
-	handle, err := pcap.OpenLive(tc.deviceName, tc.snaplen, true, handleTimeout)
-	if err != nil {
-		return err
-	}
-	tc.handle = handle
-
-	if tc.filter != "" {
-		err = handle.SetBPFFilter(tc.filter)
-		if err != nil {
-			return err
-		}
-	}
-	tc.packetSource = gopacket.NewPacketSource(handle, handle.LinkType())
-	return nil
 }
 
 // Close cleans up resources for the transport channel instance
