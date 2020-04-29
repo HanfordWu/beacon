@@ -17,6 +17,7 @@ var dest string
 var timeout int
 var numPackets int
 var hops string
+var block bool
 
 // ProbeCmd represents the probe subcommand which allows a user to send
 // a probe of packets over a path from source to dest
@@ -34,6 +35,7 @@ func initProbe() {
 	ProbeCmd.Flags().IntVarP(&timeout, "timeout", "t", 3, "time (s) to wait on a packet to return")
 	ProbeCmd.Flags().IntVarP(&numPackets, "num-packets", "n", 30, "number of probes to send per hop")
 	ProbeCmd.Flags().StringVarP(&hops, "path", "p", "", "manually define a comma separated list of hops to probe")
+	ProbeCmd.Flags().BoolVarP(&block, "block", "b", false, "block on receiving a result from each hop per packet")
 }
 
 func probePreRun(cmd *cobra.Command, args []string) error {
@@ -86,7 +88,14 @@ func probeRun(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	for res := range beacon.ProbeEachHopOfPath(path, interfaceDevice, numPackets, timeout) {
+	var resultChan <-chan beacon.BoomerangResult
+	if block {
+		resultChan = beacon.ProbeEachHopOfPathSync(path, interfaceDevice, numPackets, timeout)
+	} else {
+		resultChan = beacon.ProbeEachHopOfPath(path, interfaceDevice, numPackets, timeout)
+	}
+
+	for res := range resultChan {
 		err := handleResult(res)
 		if err != nil {
 			return err
