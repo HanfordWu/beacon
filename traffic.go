@@ -228,7 +228,9 @@ func Boomerang(path Path, tc *TransportChannel, timeout int) BoomerangResult {
 		case <-timer.C:
 			resultChan <- BoomerangResult{
 				Payload: BoomerangPayload{
-					DestIP: path[len(path)-1],
+					DestIP:      path[len(path)-1],
+					TxTimestamp: txTime,
+					RxTimestamp: time.Now().UTC(),
 				},
 				Err:       errors.New("timed out waiting for packet from " + path[len(path)-1].String()),
 				ErrorType: timedOut,
