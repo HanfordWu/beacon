@@ -71,6 +71,8 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 		return nil, err
 	} else if err := inactive.SetSnapLen(4800); err != nil {
 		return nil, err
+	} else if err := inactive.SetBufferSize(16 * 1024 * 1024); err != nil {
+		return nil, err
 	}
 
 	handle, err := inactive.Activate()
@@ -94,7 +96,7 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 func (tc *TransportChannel) Rx() chan gopacket.Packet {
 	// return tc.packetSource.Packets()
 	if tc.packets == nil {
-		tc.packets = make(chan gopacket.Packet)
+		tc.packets = make(chan gopacket.Packet, 1000000)
 		go tc.packetsToChannel()
 	}
 	return tc.packets
