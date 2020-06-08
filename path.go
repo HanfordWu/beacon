@@ -12,6 +12,15 @@ import (
 // Path is a slice of IPs which represents a path through the network
 type Path []net.IP
 
+func (p Path) SubPath(lastHop net.IP) Path {
+    for idx, IP := range p {
+        if lastHop.Equal(IP) {
+            return p[:idx]
+        }
+    }
+    return []net.IP{}
+}
+
 // PathChannel is the channel version of a Path
 type PathChannel chan net.IP
 
