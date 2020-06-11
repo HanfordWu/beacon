@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -118,6 +119,28 @@ func ProbeEachHopOfPathSync(path Path, interfaceDevice string, numPackets int, t
 	return resultChan
 }
 
+// ProbeEachHopOfPathShared probes each hop in a path, but accepts a transport channel as an argument.  This allows the caller to share
+// one transport channel between many calls to Probe.  The supplied tranport channel must have a BPFFilter of "ip proto 4"
+func ProbeEachHopOfPathShared(tc *TransportChannel, path Path, numPackets int, timeout int) <-chan BoomerangResult {
+	if !strings.Contains(tc.filter, "ip proto 4") {
+		resultChan := make(chan BoomerangResult)
+
+		errMsg := fmt.Sprintf("The supplied TransportChannel must have a BPFFilter containing ip proto 4. The supplied filter was: %s", tc.filter)
+		resultChan <- BoomerangResult{Err: fmt.Errorf(errMsg), ErrorType: fatal}
+
+		return resultChan
+	}
+
+	tc.RxForListeners()
+
+	resultChannels := make([]chan BoomerangResult, len(path)-1)
+	for i := 2; i <= len(path); i++ {
+		resultChannels[i-2] = ProbeShared(path[0:i], tc, numPackets, timeout)
+	}
+
+	return merge(resultChannels...)
+}
+
 // Probe generates traffic over a given path and returns a channel of boomerang results
 func Probe(path Path, tc *TransportChannel, numPackets int, timeout int) chan BoomerangResult {
 	resultChan := make(chan BoomerangResult)
@@ -141,6 +164,20 @@ func Probe(path Path, tc *TransportChannel, numPackets int, timeout int) chan Bo
 					return
 				}
 			}
+			resultChan <- result
+		}
+		close(resultChan)
+	}()
+
+	return resultChan
+}
+
+func ProbeShared(path Path, tc *TransportChannel, numPackets int, timeout int) chan BoomerangResult {
+	resultChan := make(chan BoomerangResult)
+
+	go func() {
+		for i := 1; i <= numPackets; i++ {
+			result := BoomerangShared(path, tc, timeout)
 			resultChan <- result
 		}
 		close(resultChan)
@@ -201,6 +238,111 @@ func Boomerang(path Path, tc *TransportChannel, timeout int) BoomerangResult {
 		}
 	}()
 
+	go func() {
+		<-listenerReady
+
+		timeOutDuration := time.Duration(timeout) * time.Second
+		timer := time.NewTimer(timeOutDuration)
+
+		txTime := time.Now().UTC()
+		err := tc.SendToPath(buf.Bytes(), path)
+		if err != nil {
+			fmt.Printf("error in SendToPath: %s\n", err)
+			resultChan <- BoomerangResult{
+				Err:       err,
+				ErrorType: sendError,
+				Payload: BoomerangPayload{
+					DestIP: path[len(path)-1],
+				},
+			}
+			return
+		}
+
+		select {
+		case result := <-seen:
+			result.Payload.TxTimestamp = txTime
+			resultChan <- result
+		case <-timer.C:
+			resultChan <- BoomerangResult{
+				Payload: BoomerangPayload{
+					DestIP:      path[len(path)-1],
+					TxTimestamp: txTime,
+					RxTimestamp: time.Now().UTC(),
+				},
+				Err:       errors.New("timed out waiting for packet from " + path[len(path)-1].String()),
+				ErrorType: timedOut,
+			}
+		}
+	}()
+
+	return <-resultChan
+}
+
+// BoomerangShared sends one packet which "boomerangs" over a given path.  For example, if the path is A,B,C,D the packet will travel
+// A -> B -> C -> D -> C -> B -> A
+func BoomerangShared(path Path, tc *TransportChannel, timeout int) BoomerangResult {
+	listenerReady := make(chan bool)
+	seen := make(chan BoomerangResult)
+	resultChan := make(chan BoomerangResult)
+
+	destHop := path[len(path)-1]
+	id := uuid.New().String()
+	payload, err := json.Marshal(NewBoomerangPayload(destHop, id))
+	if err != nil {
+		return BoomerangResult{
+			Err:       err,
+			ErrorType: fatal,
+		}
+	}
+
+	buf := gopacket.NewSerializeBuffer()
+	err = CreateRoundTripPacketForPath(path, payload, buf)
+	if err != nil {
+		return BoomerangResult{
+			Err:       err,
+			ErrorType: fatal,
+		}
+	}
+
+	criteria := func(packet gopacket.Packet) bool {
+		udpLayer := packet.Layer(layers.LayerTypeUDP)
+		ipv4Layer := packet.Layer(layers.LayerTypeIPv4)
+		udp, _ := udpLayer.(*layers.UDP)
+		ip4, _ := ipv4Layer.(*layers.IPv4)
+
+		if ip4.DstIP.Equal(path[0]) && ip4.SrcIP.Equal(path[1]) {
+			unmarshalledPayload := &BoomerangPayload{}
+			err := json.Unmarshal(udp.Payload, unmarshalledPayload)
+			if err != nil {
+				return false
+			}
+
+			if unmarshalledPayload.ID == id {
+				return true
+			}
+		}
+		return false
+	}
+
+	packetMatchChan := tc.RegisterListener(NewListener(criteria))
+
+	go func() {
+		listenerReady <- true
+		for packet := range packetMatchChan {
+			udpLayer := packet.Layer(layers.LayerTypeUDP)
+			udp, _ := udpLayer.(*layers.UDP)
+
+			unmarshalledPayload := &BoomerangPayload{}
+			json.Unmarshal(udp.Payload, unmarshalledPayload) // handle unmarshal errors
+			unmarshalledPayload.RxTimestamp = time.Now().UTC()
+			seen <- BoomerangResult{
+				Payload: *unmarshalledPayload,
+			}
+			return
+		}
+	}()
+
+	// tx goroutine
 	go func() {
 		<-listenerReady
 
