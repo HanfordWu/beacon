@@ -17,6 +17,7 @@ import (
 type TransportChannel struct {
 	handle       *pcap.Handle
 	packetSource *gopacket.PacketSource
+	listenerMap  *ListenerMap
 	packets      chan gopacket.Packet
 	deviceName   string
 	snaplen      int32
@@ -53,8 +54,9 @@ func WithTimeout(timeout int) TransportChannelOption {
 // NewTransportChannel instantiates a new transport chanel
 func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, error) {
 	tc := &TransportChannel{
-		snaplen: 1600,
-		filter:  "",
+		snaplen:     1600,
+		filter:      "",
+		listenerMap: NewListenerMap(),
 	}
 
 	for _, opt := range options {
@@ -138,19 +140,11 @@ func (tc *TransportChannel) packetsToChannel() {
 	}
 }
 
-// RxWithCondition synchronously returns the first packet from the TransportChannel's
-// packetSource which satisfies the filter function.
-func (tc *TransportChannel) RxWithCondition(filter func(gopacket.Packet) bool) chan gopacket.Packet {
-	foundPacketChan := make(chan gopacket.Packet)
-	go func() {
-		for packet := range tc.Rx() {
-			if filter(packet) {
-				foundPacketChan <- packet
-			}
-		}
-	}()
-
-	return foundPacketChan
+// RxForListeners runs listeners on each incoming packet
+func (tc *TransportChannel) RxForListeners() {
+	for packet := range tc.Rx() {
+		go tc.listenerMap.Run(packet)
+	}
 }
 
 // SendTo sends a packet to the specified ip address
@@ -213,4 +207,13 @@ func (tc *TransportChannel) FindLocalIP() (net.IP, error) {
 	}
 
 	return eth0Device.Addresses[0].IP, nil
+}
+
+// RegisterListener attaches a packet listener to the current transport channel.
+// When the packet listener finds a packet matching its criteria, the packet will
+// be sent to the caller over the returned channel
+func (tc *TransportChannel) RegisterListener(l *Listener) chan gopacket.Packet {
+	tc.listenerMap.Store(l.id, l)
+
+	return l.matchChan
 }

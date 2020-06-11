@@ -12,14 +12,14 @@ import (
 // Path is a slice of IPs which represents a path through the network
 type Path []net.IP
 
-// SubPath returns all the elements in the path up to and including 
+// SubPath returns all the elements in the path up to and including
 func (p Path) SubPath(lastHop net.IP) Path {
-    for idx, IP := range p {
-        if lastHop.Equal(IP) {
-            return p[:idx + 1]
-        }
-    }
-    return []net.IP{}
+	for idx, IP := range p {
+		if lastHop.Equal(IP) {
+			return p[:idx+1]
+		}
+	}
+	return []net.IP{}
 }
 
 // PathChannel is the channel version of a Path
