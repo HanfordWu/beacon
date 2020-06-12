@@ -94,6 +94,14 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 	return tc, nil
 }
 
+func (tc *TransportChannel) Stats() string {
+	stats, err := tc.handle.Stats()
+	if err != nil {
+		return fmt.Sprintf("Encountered an error trying to produce handle stats: %s", err)
+	}
+	return fmt.Sprintf("%+v", stats)
+}
+
 // Rx returns a packet channel over which packets will be pushed onto
 func (tc *TransportChannel) Rx() chan gopacket.Packet {
 	// return tc.packetSource.Packets()
