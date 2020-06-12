@@ -304,20 +304,12 @@ func BoomerangShared(path Path, tc *TransportChannel, timeout int) BoomerangResu
 		}
 	}
 
-	criteria := func(packet gopacket.Packet) bool {
-		udpLayer := packet.Layer(layers.LayerTypeUDP)
+	criteria := func(packet gopacket.Packet, payload *BoomerangPayload) bool {
 		ipv4Layer := packet.Layer(layers.LayerTypeIPv4)
-		udp, _ := udpLayer.(*layers.UDP)
 		ip4, _ := ipv4Layer.(*layers.IPv4)
 
 		if ip4.DstIP.Equal(path[0]) && ip4.SrcIP.Equal(path[1]) {
-			unmarshalledPayload := &BoomerangPayload{}
-			err := json.Unmarshal(udp.Payload, unmarshalledPayload)
-			if err != nil {
-				return false
-			}
-
-			if unmarshalledPayload.ID == id {
+			if payload.ID == id {
 				return true
 			}
 		}
