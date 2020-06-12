@@ -142,8 +142,12 @@ func (tc *TransportChannel) packetsToChannel() {
 
 // RxForListeners runs listeners on each incoming packet
 func (tc *TransportChannel) RxForListeners() {
-	for packet := range tc.Rx() {
-		go tc.listenerMap.Run(packet)
+	if tc.packets == nil {
+		go func() {
+			for packet := range tc.Rx() {
+				go tc.listenerMap.Run(packet)
+			}
+		}()
 	}
 }
 
