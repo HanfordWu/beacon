@@ -87,6 +87,6 @@ func (lm *ListenerMap) Run(p gopacket.Packet) {
 	for _, listener := range listenersToDelete {
 		// TODO: Each iteration of this loop will lock and unlock the listenerMap
 		// consider implementing bulk delete which only locks & unlocks once
-		lm.Delete(listener.id)
+		go lm.Delete(listener.id)
 	}
 }
