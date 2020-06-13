@@ -8,7 +8,7 @@ import (
 )
 
 // Traceroute performs traditional traceroute
-func Traceroute(destIP net.IP) error {
+func Traceroute(destIP net.IP, timeout int) error {
 	destHostname, err := net.LookupAddr(destIP.String())
 	if err != nil {
 		fmt.Printf("Doing traceroute to %s\n", destIP)
@@ -31,12 +31,21 @@ func Traceroute(destIP net.IP) error {
 	if err != nil {
 		return fmt.Errorf("Error creating transport channel: %s", err)
 	}
-	pc, err := tc.GetPathChannelTo(destIP)
+	pc, err := tc.GetPathChannelTo(destIP, timeout)
 	if err != nil {
 		return err
 	}
 
+	hopIdx := 1
 	for hop := range pc {
+		fmt.Printf("%d: ", hopIdx)
+		hopIdx++
+
+		if hop == nil {
+			fmt.Println("*")
+			continue
+		}
+
 		hostname, err := net.LookupAddr(hop.String())
 		if err != nil {
 			fmt.Println(hop.String())

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -26,10 +27,10 @@ func (p Path) SubPath(lastHop net.IP) Path {
 type PathChannel chan net.IP
 
 // GetPathTo returns a Path to a destination IP from the caller
-func (tc *TransportChannel) GetPathTo(destIP net.IP) (Path, error) {
+func (tc *TransportChannel) GetPathTo(destIP net.IP, timeout int) (Path, error) {
 	path := make([]net.IP, 0)
 
-	pc, err := tc.GetPathChannelTo(destIP)
+	pc, err := tc.GetPathChannelTo(destIP, timeout)
 	if err != nil {
 		return path, err
 	}
@@ -42,10 +43,10 @@ func (tc *TransportChannel) GetPathTo(destIP net.IP) (Path, error) {
 }
 
 // GetPathFrom returns a Path from a destination IP back to the caller
-func (tc *TransportChannel) GetPathFrom(destIP net.IP) (Path, error) {
+func (tc *TransportChannel) GetPathFrom(destIP net.IP, timeout int) (Path, error) {
 	path := make([]net.IP, 0)
 
-	pc, err := tc.GetPathChannelFrom(destIP)
+	pc, err := tc.GetPathChannelFrom(destIP, timeout)
 	if err != nil {
 		return path, err
 	}
@@ -58,10 +59,10 @@ func (tc *TransportChannel) GetPathFrom(destIP net.IP) (Path, error) {
 }
 
 // GetPathFromSourceToDest returns a Path from a sourceIP to a destIP
-func (tc *TransportChannel) GetPathFromSourceToDest(sourceIP, destIP net.IP) (Path, error) {
+func (tc *TransportChannel) GetPathFromSourceToDest(sourceIP, destIP net.IP, timeout int) (Path, error) {
 	path := make([]net.IP, 0)
 
-	pc, err := tc.GetPathChannelFromSourceToDest(sourceIP, destIP)
+	pc, err := tc.GetPathChannelFromSourceToDest(sourceIP, destIP, timeout)
 	if err != nil {
 		return path, err
 	}
@@ -74,7 +75,7 @@ func (tc *TransportChannel) GetPathFromSourceToDest(sourceIP, destIP net.IP) (Pa
 }
 
 // GetPathChannelTo returns a PathChannel to a destination IP from the caller
-func (tc *TransportChannel) GetPathChannelTo(destIP net.IP) (PathChannel, error) {
+func (tc *TransportChannel) GetPathChannelTo(destIP net.IP, timeout int) (PathChannel, error) {
 	if tc.filter != "icmp" {
 		errMsg := fmt.Sprintf("BPF filter must be icmp: got %s instead", tc.filter)
 		return nil, errors.New(errMsg)
@@ -103,6 +104,8 @@ func (tc *TransportChannel) GetPathChannelTo(destIP net.IP) (PathChannel, error)
 			select {
 			case ip := <-found:
 				pathChan <- ip
+			case <-time.After(time.Duration(timeout) * time.Second):
+				pathChan <- nil
 			case <-done:
 				return
 			}
@@ -131,7 +134,7 @@ func (tc *TransportChannel) GetPathChannelTo(destIP net.IP) (PathChannel, error)
 }
 
 // GetPathChannelFrom returns a PathChannel from a destination IP back to the caller
-func (tc *TransportChannel) GetPathChannelFrom(destIP net.IP) (PathChannel, error) {
+func (tc *TransportChannel) GetPathChannelFrom(destIP net.IP, timeout int) (PathChannel, error) {
 	if tc.filter != "icmp" {
 		errMsg := fmt.Sprintf("BPF filter must be icmp: got %s instead", tc.filter)
 		return nil, errors.New(errMsg)
@@ -167,6 +170,8 @@ func (tc *TransportChannel) GetPathChannelFrom(destIP net.IP) (PathChannel, erro
 			select {
 			case ip := <-found:
 				pathChan <- ip
+			case <-time.After(time.Duration(timeout) * time.Second):
+				pathChan <- nil
 			case <-done:
 				return
 			}
@@ -196,7 +201,7 @@ func (tc *TransportChannel) GetPathChannelFrom(destIP net.IP) (PathChannel, erro
 }
 
 // GetPathChannelFromSourceToDest returns a PathChannel from a sourceIP to a destIP
-func (tc *TransportChannel) GetPathChannelFromSourceToDest(sourceIP, destIP net.IP) (PathChannel, error) {
+func (tc *TransportChannel) GetPathChannelFromSourceToDest(sourceIP, destIP net.IP, timeout int) (PathChannel, error) {
 	if tc.filter != "icmp" {
 		errMsg := fmt.Sprintf("BPF filter must be icmp: got %s instead", tc.filter)
 		return nil, errors.New(errMsg)
@@ -211,7 +216,7 @@ func (tc *TransportChannel) GetPathChannelFromSourceToDest(sourceIP, destIP net.
 		return pathChan, err
 	}
 	if sourceIP.Equal(localIP) {
-		return tc.GetPathChannelTo(destIP)
+		return tc.GetPathChannelTo(destIP, timeout)
 	}
 
 	go func() {
@@ -228,6 +233,8 @@ func (tc *TransportChannel) GetPathChannelFromSourceToDest(sourceIP, destIP net.
 			select {
 			case ip := <-found:
 				pathChan <- ip
+			case <-time.After(time.Duration(timeout) * time.Second):
+				pathChan <- nil
 			case <-done:
 				return
 			}
