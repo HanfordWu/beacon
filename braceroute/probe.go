@@ -14,7 +14,6 @@ import (
 
 var source string
 var dest string
-var timeout int
 var numPackets int
 var hops string
 var block bool
@@ -32,7 +31,6 @@ var ProbeCmd = &cobra.Command{
 func initProbe() {
 	ProbeCmd.Flags().StringVarP(&source, "source", "s", "", "source IP/host (defaults to eth0 interface)")
 	ProbeCmd.Flags().StringVarP(&dest, "dest", "d", "", "destination IP/host (required)")
-	ProbeCmd.Flags().IntVarP(&timeout, "timeout", "t", 3, "time (s) to wait on a packet to return")
 	ProbeCmd.Flags().IntVarP(&numPackets, "num-packets", "n", 30, "number of probes to send per hop")
 	ProbeCmd.Flags().StringVarP(&hops, "path", "p", "", "manually define a comma separated list of hops to probe")
 	ProbeCmd.Flags().BoolVarP(&block, "block", "b", false, "block on receiving a result from each hop per packet")
@@ -135,7 +133,7 @@ func findPathFromSourceToDest() (beacon.Path, error) {
 
 	fmt.Printf("Finding path from %s to %s\n", srcIP, destIP)
 
-	path, err := pathFinderTC.GetPathFromSourceToDest(srcIP, destIP)
+	path, err := pathFinderTC.GetPathFromSourceToDest(srcIP, destIP, timeout)
 	if err != nil {
 		return nil, err
 	}

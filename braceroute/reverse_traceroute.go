@@ -8,7 +8,7 @@ import (
 )
 
 // ReverseTraceroute uses IP in IP to perform traceroute from the remote back to the caller
-func ReverseTraceroute(destIP net.IP) error {
+func ReverseTraceroute(destIP net.IP, timeout int) error {
 	destHostname, err := net.LookupAddr(destIP.String())
 	if err != nil {
 		fmt.Printf("Doing reverse traceroute from %s\n", destIP)
@@ -31,12 +31,21 @@ func ReverseTraceroute(destIP net.IP) error {
 	if err != nil {
 		return fmt.Errorf("Error creating transport channel: %s", err)
 	}
-	pc, err := tc.GetPathChannelFrom(destIP)
+	pc, err := tc.GetPathChannelFrom(destIP, timeout)
 	if err != nil {
 		return err
 	}
 
+	hopIdx := 1
 	for hop := range pc {
+		fmt.Printf("%d: ", hopIdx)
+		hopIdx++
+
+		if hop == nil {
+			fmt.Println("*")
+			continue
+		}
+
 		hostname, err := net.LookupAddr(hop.String())
 		if err != nil {
 			fmt.Println(hop.String())
