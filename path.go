@@ -113,7 +113,7 @@ func (tc *TransportChannel) GetPathChannelTo(destIP net.IP, timeout int) (PathCh
 	}()
 
 	go func() {
-		for packet := range tc.Rx() {
+		for packet := range tc.rx() {
 			icmpLayer := packet.Layer(layers.LayerTypeICMPv4)
 			ipv4Layer := packet.Layer(layers.LayerTypeIPv4)
 			icmp, _ := icmpLayer.(*layers.ICMPv4)
@@ -179,7 +179,7 @@ func (tc *TransportChannel) GetPathChannelFrom(destIP net.IP, timeout int) (Path
 	}()
 
 	go func() {
-		for packet := range tc.Rx() {
+		for packet := range tc.rx() {
 			// TODO: consider using DecodingLayerParser https://godoc.org/github.com/google/gopacket#hdr-Fast_Decoding_With_DecodingLayerParser
 			icmpLayer := packet.Layer(layers.LayerTypeICMPv4)
 			ipv4Layer := packet.Layer(layers.LayerTypeIPv4)
@@ -242,7 +242,7 @@ func (tc *TransportChannel) GetPathChannelFromSourceToDest(sourceIP, destIP net.
 	}()
 
 	go func() {
-		for packet := range tc.Rx() {
+		for packet := range tc.rx() {
 			icmpLayer := packet.Layer(layers.LayerTypeICMPv4)
 			ipv4Layer := packet.Layer(layers.LayerTypeIPv4)
 			icmp, _ := icmpLayer.(*layers.ICMPv4)

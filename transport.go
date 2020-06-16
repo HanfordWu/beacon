@@ -20,7 +20,8 @@ type TransportChannel struct {
 	listenerMap  *ListenerMap
 	packets      chan gopacket.Packet
 	deviceName   string
-	snaplen      int32
+	snaplen      int
+	bufferSize   int
 	filter       string
 	timeout      int
 }
@@ -51,10 +52,25 @@ func WithTimeout(timeout int) TransportChannelOption {
 	}
 }
 
+// WithSnapLen sets the snaplen on the enclosed pcap Handle
+func WithSnapLen(snaplen int) TransportChannelOption {
+	return func(tc *TransportChannel) {
+		tc.snaplen = snaplen
+	}
+}
+
+// WithBufferSize sets the buffer size on the enclosed pcap Handle
+func WithBufferSize(bufferSize int) TransportChannelOption {
+	return func(tc *TransportChannel) {
+		tc.bufferSize = bufferSize
+	}
+}
+
 // NewTransportChannel instantiates a new transport chanel
 func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, error) {
 	tc := &TransportChannel{
-		snaplen:     1600,
+		snaplen:     4800,
+		bufferSize:  16 * 1024 * 1024,
 		filter:      "",
 		listenerMap: NewListenerMap(),
 	}
@@ -71,9 +87,9 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 
 	if err := inactive.SetImmediateMode(true); err != nil {
 		return nil, err
-	} else if err := inactive.SetSnapLen(4800); err != nil {
+	} else if err := inactive.SetSnapLen(tc.snaplen); err != nil {
 		return nil, err
-	} else if err := inactive.SetBufferSize(16 * 1024 * 1024); err != nil {
+	} else if err := inactive.SetBufferSize(tc.bufferSize); err != nil {
 		return nil, err
 	}
 
@@ -91,6 +107,13 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 	}
 	tc.packetSource = gopacket.NewPacketSource(handle, handle.LinkType())
 
+	// activate listeners
+	go func() {
+		for packet := range tc.rx() {
+			go tc.listenerMap.Run(packet)
+		}
+	}()
+
 	return tc, nil
 }
 
@@ -102,8 +125,9 @@ func (tc *TransportChannel) Stats() string {
 	return fmt.Sprintf("%+v", stats)
 }
 
-// Rx returns a packet channel over which packets will be pushed onto
-func (tc *TransportChannel) Rx() chan gopacket.Packet {
+// rx returns a packet channel over which packets will be pushed onto
+// this method is private to prevent users from interfering with the listeners
+func (tc *TransportChannel) rx() chan gopacket.Packet {
 	// return tc.packetSource.Packets()
 	if tc.packets == nil {
 		tc.packets = make(chan gopacket.Packet, 1000000)
@@ -145,17 +169,6 @@ func (tc *TransportChannel) packetsToChannel() {
 
 		// Sleep briefly and try again
 		time.Sleep(time.Millisecond * time.Duration(5))
-	}
-}
-
-// RxForListeners runs listeners on each incoming packet
-func (tc *TransportChannel) RxForListeners() {
-	if tc.packets == nil {
-		go func() {
-			for packet := range tc.Rx() {
-				go tc.listenerMap.Run(packet)
-			}
-		}()
 	}
 }
 

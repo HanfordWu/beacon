@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
 	"github.com/google/uuid"
 )
 
@@ -74,14 +73,9 @@ func (lm *ListenerMap) Delete(key uuid.UUID) {
 func (lm *ListenerMap) Run(p gopacket.Packet) {
 	listenersToDelete := make([]*Listener, 0)
 
-	udpLayer := p.Layer(layers.LayerTypeUDP)
-	udp, _ := udpLayer.(*layers.UDP)
-
 	unmarshalledPayload := &BoomerangPayload{}
-	err := json.Unmarshal(udp.Payload, unmarshalledPayload)
-	if err != nil {
-		// if the payload is not valid json, we don't need to check it
-		return
+	if app := p.ApplicationLayer(); app != nil {
+		json.Unmarshal(app.Payload(), unmarshalledPayload)
 	}
 
 	lm.Lock()

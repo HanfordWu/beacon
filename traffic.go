@@ -126,8 +126,6 @@ func ProbeEachHopOfPathWithTC(path Path, tc *TransportChannel, numPackets int, t
 		return resultChan
 	}
 
-	tc.RxForListeners()
-
 	resultChannels := make([]chan BoomerangResult, len(path)-1)
 	for i := 2; i <= len(path); i++ {
 		resultChannels[i-2] = Probe(path[0:i], tc, numPackets, timeout)
