@@ -53,26 +53,21 @@ func (b *BoomerangResult) IsFatal() bool {
 	return b.ErrorType == fatal
 }
 
-// ProbeEachHopOfPath accepts a path and some configuration variables, and returns a merged channel where results
-// from every hop are pushed onto
-// if errors are encountered while creating the transport channel, a fatal BoomerangResult will be pushed over the
-// returned channel
-func ProbeEachHopOfPath(path Path, interfaceDevice string, numPackets int, timeout int) <-chan BoomerangResult {
-	resultChannels := make([]chan BoomerangResult, len(path)-1)
-
-	tc, err := NewTransportChannel(
-		WithBPFFilter("ip proto 4"),
-		WithInterface(interfaceDevice),
-		WithTimeout(100),
-	)
-	if err != nil {
+// ProbeEachHopOfPath probes each hop in a path, but accepts a transport channel as an argument.  This allows the caller to share
+// one transport channel between many calls to Probe.  The supplied tranport channel must have a BPFFilter of "ip proto 4"
+func (tc *TransportChannel) ProbeEachHopOfPath(path Path, numPackets int, timeout int) <-chan BoomerangResult {
+	if !strings.Contains(tc.filter, "ip proto 4") {
 		resultChan := make(chan BoomerangResult)
-		resultChan <- BoomerangResult{Err: err, ErrorType: fatal}
+
+		errMsg := fmt.Sprintf("The supplied TransportChannel must have a BPFFilter containing ip proto 4. The supplied filter was: %s", tc.filter)
+		resultChan <- BoomerangResult{Err: fmt.Errorf(errMsg), ErrorType: fatal}
+
 		return resultChan
 	}
 
+	resultChannels := make([]chan BoomerangResult, len(path)-1)
 	for i := 2; i <= len(path); i++ {
-		resultChannels[i-2] = Probe(path[0:i], tc, numPackets, timeout)
+		resultChannels[i-2] = tc.Probe(path[0:i], numPackets, timeout)
 	}
 
 	return merge(resultChannels...)
@@ -80,18 +75,17 @@ func ProbeEachHopOfPath(path Path, interfaceDevice string, numPackets int, timeo
 
 // ProbeEachHopOfPathSync synchronously probes each hop in a path.  That is, it waits for each round of packets to come
 // back from each hop before sending the next round
-func ProbeEachHopOfPathSync(path Path, interfaceDevice string, numPackets int, timeout int) <-chan BoomerangResult {
-	resultChan := make(chan BoomerangResult)
+func (tc *TransportChannel) ProbeEachHopOfPathSync(path Path, numPackets int, timeout int) <-chan BoomerangResult {
+	if !strings.Contains(tc.filter, "ip proto 4") {
+		resultChan := make(chan BoomerangResult)
 
-	tc, err := NewTransportChannel(
-		WithBPFFilter("ip proto 4"),
-		WithInterface(interfaceDevice),
-		WithTimeout(100),
-	)
-	if err != nil {
-		resultChan <- BoomerangResult{Err: err, ErrorType: fatal}
+		errMsg := fmt.Sprintf("The supplied TransportChannel must have a BPFFilter containing ip proto 4. The supplied filter was: %s", tc.filter)
+		resultChan <- BoomerangResult{Err: fmt.Errorf(errMsg), ErrorType: fatal}
+
 		return resultChan
 	}
+
+	resultChan := make(chan BoomerangResult)
 
 	go func() {
 		defer close(resultChan)
@@ -101,7 +95,7 @@ func ProbeEachHopOfPathSync(path Path, interfaceDevice string, numPackets int, t
 
 			for i := 2; i <= len(path); i++ {
 				go func(idx int) {
-					resultChan <- Boomerang(path[0:idx], tc, timeout)
+					resultChan <- tc.Boomerang(path[0:idx], timeout)
 					wg.Done()
 				}(i)
 			}
@@ -114,33 +108,13 @@ func ProbeEachHopOfPathSync(path Path, interfaceDevice string, numPackets int, t
 	return resultChan
 }
 
-// ProbeEachHopOfPathWithTC probes each hop in a path, but accepts a transport channel as an argument.  This allows the caller to share
-// one transport channel between many calls to Probe.  The supplied tranport channel must have a BPFFilter of "ip proto 4"
-func ProbeEachHopOfPathWithTC(path Path, tc *TransportChannel, numPackets int, timeout int) <-chan BoomerangResult {
-	if !strings.Contains(tc.filter, "ip proto 4") {
-		resultChan := make(chan BoomerangResult)
-
-		errMsg := fmt.Sprintf("The supplied TransportChannel must have a BPFFilter containing ip proto 4. The supplied filter was: %s", tc.filter)
-		resultChan <- BoomerangResult{Err: fmt.Errorf(errMsg), ErrorType: fatal}
-
-		return resultChan
-	}
-
-	resultChannels := make([]chan BoomerangResult, len(path)-1)
-	for i := 2; i <= len(path); i++ {
-		resultChannels[i-2] = Probe(path[0:i], tc, numPackets, timeout)
-	}
-
-	return merge(resultChannels...)
-}
-
 // Probe generates traffic over a given path and returns a channel of boomerang results
-func Probe(path Path, tc *TransportChannel, numPackets int, timeout int) chan BoomerangResult {
+func (tc *TransportChannel) Probe(path Path, numPackets int, timeout int) chan BoomerangResult {
 	resultChan := make(chan BoomerangResult)
 
 	go func() {
 		for i := 1; i <= numPackets; i++ {
-			result := Boomerang(path, tc, timeout)
+			result := tc.Boomerang(path, timeout)
 			resultChan <- result
 		}
 		close(resultChan)
@@ -151,7 +125,7 @@ func Probe(path Path, tc *TransportChannel, numPackets int, timeout int) chan Bo
 
 // Boomerang sends one packet which "boomerangs" over a given path.  For example, if the path is A,B,C,D the packet will travel
 // A -> B -> C -> D -> C -> B -> A
-func Boomerang(path Path, tc *TransportChannel, timeout int) BoomerangResult {
+func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 	listenerReady := make(chan bool)
 	seen := make(chan BoomerangResult)
 	resultChan := make(chan BoomerangResult)
