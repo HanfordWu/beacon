@@ -161,7 +161,8 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 		return false
 	}
 
-	packetMatchChan := tc.RegisterListener(NewListener(criteria))
+	listener := NewListener(criteria)
+	packetMatchChan := tc.RegisterListener(listener)
 
 	go func() {
 		listenerReady <- true
@@ -205,6 +206,7 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 			result.Payload.TxTimestamp = txTime
 			resultChan <- result
 		case <-timer.C:
+			tc.UnregisterListener(listener)
 			resultChan <- BoomerangResult{
 				Payload: BoomerangPayload{
 					DestIP:      path[len(path)-1],
