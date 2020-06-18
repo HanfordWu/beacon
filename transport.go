@@ -233,12 +233,3 @@ func (tc *TransportChannel) FindLocalIP() (net.IP, error) {
 
 	return eth0Device.Addresses[0].IP, nil
 }
-
-// RegisterListener attaches a packet listener to the current transport channel.
-// When the packet listener finds a packet matching its criteria, the packet will
-// be sent to the caller over the returned channel
-func (tc *TransportChannel) RegisterListener(l *Listener) chan gopacket.Packet {
-	tc.listenerMap.Store(l.id, l)
-
-	return l.matchChan
-}

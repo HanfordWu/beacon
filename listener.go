@@ -96,3 +96,19 @@ func (lm *ListenerMap) Run(p gopacket.Packet) {
 		go lm.Delete(listener.id)
 	}
 }
+
+// RegisterListener attaches a packet listener to the current transport channel.
+// When the packet listener finds a packet matching its criteria, the packet will
+// be sent to the caller over the returned channel
+func (tc *TransportChannel) RegisterListener(l *Listener) chan gopacket.Packet {
+	tc.listenerMap.Store(l.id, l)
+
+	return l.matchChan
+}
+
+// UnRegisterListener removes an attached listener
+func (tc *TransportChannel) UnregisterListener(l *Listener) uuid.UUID {
+	tc.listenerMap.Delete(l.id)
+
+	return l.id
+}
