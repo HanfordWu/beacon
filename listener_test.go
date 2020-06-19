@@ -110,11 +110,12 @@ func TestRunMatch(t *testing.T) {
 
 	lm.Run(packet)
 
-	for range l.matchChan {
-		return // a match came back over the match channel
+	select {
+	case <-l.matchChan:
+		return
+	case <-time.After(100 * time.Millisecond):
+		t.Errorf("Despite criteria matching, a packet never came back over the match chan")
 	}
-
-	t.Errorf("Despite criteria matching, a packet never came back over the match chan")
 }
 
 func TestRunNoMatch(t *testing.T) {
