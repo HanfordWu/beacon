@@ -17,9 +17,12 @@ import (
 type TransportChannel struct {
 	handle       *pcap.Handle
 	packetSource *gopacket.PacketSource
+	listenerMap  *ListenerMap
 	packets      chan gopacket.Packet
+	socketFD     int
 	deviceName   string
-	snaplen      int32
+	snaplen      int
+	bufferSize   int
 	filter       string
 	timeout      int
 }
@@ -50,11 +53,27 @@ func WithTimeout(timeout int) TransportChannelOption {
 	}
 }
 
+// WithSnapLen sets the snaplen on the enclosed pcap Handle
+func WithSnapLen(snaplen int) TransportChannelOption {
+	return func(tc *TransportChannel) {
+		tc.snaplen = snaplen
+	}
+}
+
+// WithBufferSize sets the buffer size on the enclosed pcap Handle
+func WithBufferSize(bufferSize int) TransportChannelOption {
+	return func(tc *TransportChannel) {
+		tc.bufferSize = bufferSize
+	}
+}
+
 // NewTransportChannel instantiates a new transport chanel
 func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, error) {
 	tc := &TransportChannel{
-		snaplen: 1600,
-		filter:  "",
+		snaplen:     4800,
+		bufferSize:  16 * 1024 * 1024,
+		filter:      "",
+		listenerMap: NewListenerMap(),
 	}
 
 	for _, opt := range options {
@@ -69,9 +88,9 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 
 	if err := inactive.SetImmediateMode(true); err != nil {
 		return nil, err
-	} else if err := inactive.SetSnapLen(4800); err != nil {
+	} else if err := inactive.SetSnapLen(tc.snaplen); err != nil {
 		return nil, err
-	} else if err := inactive.SetBufferSize(16 * 1024 * 1024); err != nil {
+	} else if err := inactive.SetBufferSize(tc.bufferSize); err != nil {
 		return nil, err
 	}
 
@@ -89,11 +108,35 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 	}
 	tc.packetSource = gopacket.NewPacketSource(handle, handle.LinkType())
 
+	// open a raw socket, the IPPROTO_RAW protocol implies IP_HDRINCL is enabled
+	// http://man7.org/linux/man-pages/man7/raw.7.html
+	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create socket for TransportChannel: %s", err)
+	}
+	tc.socketFD = fd
+
+	// activate listeners
+	go func() {
+		for packet := range tc.rx() {
+			go tc.listenerMap.Run(packet)
+		}
+	}()
+
 	return tc, nil
 }
 
-// Rx returns a packet channel over which packets will be pushed onto
-func (tc *TransportChannel) Rx() chan gopacket.Packet {
+func (tc *TransportChannel) Stats() string {
+	stats, err := tc.handle.Stats()
+	if err != nil {
+		return fmt.Sprintf("Encountered an error trying to produce handle stats: %s", err)
+	}
+	return fmt.Sprintf("%+v", stats)
+}
+
+// rx returns a packet channel over which packets will be pushed onto
+// this method is private to prevent users from interfering with the listeners
+func (tc *TransportChannel) rx() chan gopacket.Packet {
 	// return tc.packetSource.Packets()
 	if tc.packets == nil {
 		tc.packets = make(chan gopacket.Packet, 1000000)
@@ -138,31 +181,8 @@ func (tc *TransportChannel) packetsToChannel() {
 	}
 }
 
-// RxWithCondition synchronously returns the first packet from the TransportChannel's
-// packetSource which satisfies the filter function.
-func (tc *TransportChannel) RxWithCondition(filter func(gopacket.Packet) bool) chan gopacket.Packet {
-	foundPacketChan := make(chan gopacket.Packet)
-	go func() {
-		for packet := range tc.Rx() {
-			if filter(packet) {
-				foundPacketChan <- packet
-			}
-		}
-	}()
-
-	return foundPacketChan
-}
-
 // SendTo sends a packet to the specified ip address
 func (tc *TransportChannel) SendTo(packetData []byte, destAddr net.IP) error {
-	// open a raw socket, the IPPROTO_RAW protocol implies IP_HDRINCL is enabled
-	// http://man7.org/linux/man-pages/man7/raw.7.html
-	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
-	if err != nil {
-		return fmt.Errorf("Failed to create socket: %s", err)
-	}
-	defer syscall.Close(fd)
-
 	destAddr = destAddr.To4()
 	if destAddr == nil {
 		return errors.New("dest IP must be an ipv4 address")
@@ -172,7 +192,7 @@ func (tc *TransportChannel) SendTo(packetData []byte, destAddr net.IP) error {
 		Addr: [4]byte{destAddr[0], destAddr[1], destAddr[2], destAddr[3]},
 	}
 
-	err = syscall.Sendto(fd, packetData, 0, &addr)
+	err := syscall.Sendto(tc.socketFD, packetData, 0, &addr)
 	if err != nil {
 		return fmt.Errorf("Failed to send packetData to socket: %s", err)
 	}
@@ -189,6 +209,7 @@ func (tc *TransportChannel) SendToPath(packetData []byte, path Path) error {
 
 // Close cleans up resources for the transport channel instance
 func (tc *TransportChannel) Close() {
+	syscall.Close(tc.socketFD)
 	tc.handle.Close()
 }
 
