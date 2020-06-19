@@ -110,7 +110,7 @@ func (tc *TransportChannel) RegisterListener(l *Listener) chan gopacket.Packet {
 	return l.matchChan
 }
 
-// UnRegisterListener removes an attached listener
+// UnregisterListener removes an attached listener
 func (tc *TransportChannel) UnregisterListener(l *Listener) uuid.UUID {
 	tc.listenerMap.Delete(l.id)
 
