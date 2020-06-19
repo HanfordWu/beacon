@@ -19,6 +19,7 @@ type TransportChannel struct {
 	packetSource *gopacket.PacketSource
 	listenerMap  *ListenerMap
 	packets      chan gopacket.Packet
+	socketFD     int
 	deviceName   string
 	snaplen      int
 	bufferSize   int
@@ -107,6 +108,14 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 	}
 	tc.packetSource = gopacket.NewPacketSource(handle, handle.LinkType())
 
+	// open a raw socket, the IPPROTO_RAW protocol implies IP_HDRINCL is enabled
+	// http://man7.org/linux/man-pages/man7/raw.7.html
+	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create socket for TransportChannel: %s", err)
+	}
+	tc.socketFD = fd
+
 	// activate listeners
 	go func() {
 		for packet := range tc.rx() {
@@ -174,14 +183,6 @@ func (tc *TransportChannel) packetsToChannel() {
 
 // SendTo sends a packet to the specified ip address
 func (tc *TransportChannel) SendTo(packetData []byte, destAddr net.IP) error {
-	// open a raw socket, the IPPROTO_RAW protocol implies IP_HDRINCL is enabled
-	// http://man7.org/linux/man-pages/man7/raw.7.html
-	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
-	if err != nil {
-		return fmt.Errorf("Failed to create socket: %s", err)
-	}
-	defer syscall.Close(fd)
-
 	destAddr = destAddr.To4()
 	if destAddr == nil {
 		return errors.New("dest IP must be an ipv4 address")
@@ -191,7 +192,7 @@ func (tc *TransportChannel) SendTo(packetData []byte, destAddr net.IP) error {
 		Addr: [4]byte{destAddr[0], destAddr[1], destAddr[2], destAddr[3]},
 	}
 
-	err = syscall.Sendto(fd, packetData, 0, &addr)
+	err := syscall.Sendto(tc.socketFD, packetData, 0, &addr)
 	if err != nil {
 		return fmt.Errorf("Failed to send packetData to socket: %s", err)
 	}
@@ -208,6 +209,7 @@ func (tc *TransportChannel) SendToPath(packetData []byte, path Path) error {
 
 // Close cleans up resources for the transport channel instance
 func (tc *TransportChannel) Close() {
+	syscall.Close(tc.socketFD)
 	tc.handle.Close()
 }
 
