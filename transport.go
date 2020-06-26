@@ -126,6 +126,7 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 	return tc, nil
 }
 
+// Stats displays the stats exposed by the underlying packet handle of a TransportChannel.
 func (tc *TransportChannel) Stats() string {
 	stats, err := tc.handle.Stats()
 	if err != nil {

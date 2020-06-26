@@ -24,7 +24,7 @@ func NewListener(criteria PacketFilter) *Listener {
 	return &Listener{
 		id:        uuid.New(),
 		Criteria:  criteria,
-		matchChan: make(chan gopacket.Packet),
+		matchChan: make(chan gopacket.Packet, 1),
 	}
 }
 
@@ -60,11 +60,14 @@ func (lm *ListenerMap) Load(key uuid.UUID) (value *Listener, ok bool) {
 	return value, ok
 }
 
-// Delete deletes the value for a key.
+// Delete deletes the value for a key.  no-op if key doesn't exist.
 func (lm *ListenerMap) Delete(key uuid.UUID) {
 	lm.Lock()
 	defer lm.Unlock()
 
+	if listener, ok := lm.m[key]; ok {
+		close(listener.matchChan)
+	}
 	delete(lm.m, key)
 }
 
@@ -82,6 +85,7 @@ func (lm *ListenerMap) Run(p gopacket.Packet) {
 
 	for _, listener := range lm.m {
 		// packet meets criteria
+
 		if listener.Criteria(p, unmarshalledPayload) {
 			listener.matchChan <- p
 			listenersToDelete = append(listenersToDelete, listener)
@@ -106,7 +110,7 @@ func (tc *TransportChannel) RegisterListener(l *Listener) chan gopacket.Packet {
 	return l.matchChan
 }
 
-// UnRegisterListener removes an attached listener
+// UnregisterListener removes an attached listener
 func (tc *TransportChannel) UnregisterListener(l *Listener) uuid.UUID {
 	tc.listenerMap.Delete(l.id)
 
