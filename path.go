@@ -25,16 +25,16 @@ func (p Path) SubPath(lastHop net.IP) Path {
 
 // Equal checks if two given paths are equal
 func (p Path) Equal(other Path) bool {
-    if len(p) != len(other) {
-        return false
-    }
+	if len(p) != len(other) {
+		return false
+	}
 
-    for idx := range p {
-        if !p[idx].Equal(other[idx]) {
-            return false
-        }
-    }
-    return true
+	for idx := range p {
+		if !p[idx].Equal(other[idx]) {
+			return false
+		}
+	}
+	return true
 }
 
 // PathChannel is the channel version of a Path
