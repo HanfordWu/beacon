@@ -21,6 +21,10 @@ jobs:
 
     - name: Check out code into the Go module directory
       uses: actions/checkout@v2 
+    
+    - name: Install libpcap
+      run: |
+        sudo apt-get install libpcap-dev
 
     - name: Get dependencies
       run: |
