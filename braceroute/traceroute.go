@@ -1,17 +1,20 @@
 package main
 
 import (
-	// "fmt"
-	"net"
+	"fmt"
+	// "net"
 
 	"github.com/trstruth/beacon"
 )
 
 // Traceroute performs traditional traceroute
-func Traceroute(destIP net.IP, timeout int) error {
+func Traceroute(destIP string, sourceIP string, timeout int32, interfaceDevice string) error {
 
-	beacon.TracerouteBeacon(destIP, timeout, interfaceDevice)
 
+	response, err:= beacon.TracerouteBeacon(destIP, sourceIP, timeout, interfaceDevice)
+
+	fmt.Printf("%v", response)
+	fmt.Printf("%v", err)
 	// destHostname, err := net.LookupAddr(destIP.String())
 	// if err != nil {
 	// 	fmt.Printf("Doing traceroute to %s\n", destIP)
