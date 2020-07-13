@@ -7,10 +7,22 @@ import (
 	// "github.com/trstruth/beacon"
 )
 
-// Traceroute performs traditional traceroute
-func TracerouteBeacon(destIP net.IP, timeout int, interfaceDevice string) error {
+// func DoTraceroute(destinationIP string, timeoutMs int32, interfaceDevice string) ([]string, error){
+// 	var timeout int = int(timeoutMs)
+// 	var destIP net.IP = net.ParseIP(destinationIP)
+// 	route, err:= TracerouteBeacon(destIP, timeout, interfaceDevice)
+// 	fmt.Println("Traceroute done..\n")
+// 	return route, err
+// }
 
-	fmt.Printf("Inside traceroute (beacon)")
+// Traceroute performs traditional traceroute
+// func TracerouteBeacon(destIP net.IP, timeout int, interfaceDevice string) ([]string, error) {
+func TracerouteBeacon(destinationIP string, sourceIP string, timeoutMs int32, interfaceDevice string) ([]string, error) {
+
+	var timeout int = int(timeoutMs)
+	var destIP net.IP = net.ParseIP(destinationIP)
+
+	route := make([]string, 0)
 
 	destHostname, err := net.LookupAddr(destIP.String())
 	if err != nil {
@@ -22,7 +34,7 @@ func TracerouteBeacon(destIP net.IP, timeout int, interfaceDevice string) error 
 	if interfaceDevice == "" {
 		discoveredOutboundInterface, err := GetInterfaceDeviceFromDestIP(destIP)
 		if err != nil {
-			return fmt.Errorf("Failed to find an interface for %s: %s, explicitly provide an interface with -i", destIP.String(), err)
+			return nil,fmt.Errorf("Failed to find an interface for %s: %s, explicitly provide an interface with -i", destIP.String(), err)
 		}
 		interfaceDevice = discoveredOutboundInterface
 	}
@@ -32,11 +44,22 @@ func TracerouteBeacon(destIP net.IP, timeout int, interfaceDevice string) error 
 		WithInterface(interfaceDevice),
 	)
 	if err != nil {
-		return fmt.Errorf("Error creating transport channel: %s", err)
+		return nil, fmt.Errorf("Error creating transport channel: %s", err)
 	}
-	pc, err := tc.GetPathChannelTo(destIP, timeout)
+
+	pathChannelParam := PathChannelParams{
+		destIP: destIP,
+		overrideSourceIP: nil,
+		timeoutMs: timeout,
+	}
+
+	if len(sourceIP) > 0 {
+		pathChannelParam.overrideSourceIP = net.ParseIP(sourceIP)
+	}
+
+	pc, err := tc.GetPathChannelTo(pathChannelParam)
 	if err != nil {
-		return err
+		return nil,err
 	}
 
 	hopIdx := 1
@@ -46,16 +69,20 @@ func TracerouteBeacon(destIP net.IP, timeout int, interfaceDevice string) error 
 
 		if hop == nil {
 			fmt.Println("*")
+			route = append(route, "*")
 			continue
 		}
 
 		hostname, err := net.LookupAddr(hop.String())
 		if err != nil {
 			fmt.Println(hop.String())
+			route = append(route, hop.String())
+
 		} else {
 			fmt.Printf("%s (%s)\n", hostname[0], hop.String())
+			route = append(route, "%s (%s)\n", hostname[0], hop.String())
 		}
 	}
-
-	return nil
+	fmt.Println(route)
+	return route, nil
 }
