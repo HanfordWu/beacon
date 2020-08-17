@@ -3,20 +3,9 @@ package beacon
 import (
 	"fmt"
 	"net"
-
-	// "github.com/trstruth/beacon"
 )
 
-// func DoTraceroute(destinationIP string, timeoutMs int32, interfaceDevice string) ([]string, error){
-// 	var timeout int = int(timeoutMs)
-// 	var destIP net.IP = net.ParseIP(destinationIP)
-// 	route, err:= TracerouteBeacon(destIP, timeout, interfaceDevice)
-// 	fmt.Println("Traceroute done..\n")
-// 	return route, err
-// }
-
-// Traceroute performs traditional traceroute
-// func TracerouteBeacon(destIP net.IP, timeout int, interfaceDevice string) ([]string, error) {
+// Performs Traceroute
 func TracerouteBeacon(destinationIP string, sourceIP string, timeoutMs int32, interfaceDevice string) ([]string, error) {
 
 	var timeout int = int(timeoutMs)
@@ -43,6 +32,7 @@ func TracerouteBeacon(destinationIP string, sourceIP string, timeoutMs int32, in
 		WithBPFFilter("icmp"),
 		WithInterface(interfaceDevice),
 	)
+
 	if err != nil {
 		return nil, fmt.Errorf("Error creating transport channel: %s", err)
 	}
@@ -83,6 +73,7 @@ func TracerouteBeacon(destinationIP string, sourceIP string, timeoutMs int32, in
 			route = append(route, "%s (%s)\n", hostname[0], hop.String())
 		}
 	}
+	
 	fmt.Println(route)
 	return route, nil
 }
