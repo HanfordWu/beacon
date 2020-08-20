@@ -11,9 +11,9 @@ import (
 )
 
 type PathChannelParams struct {
-	destIP net.IP
+	destIP           net.IP
 	overrideSourceIP net.IP
-	timeoutMs int
+	timeoutMs        int
 }
 
 // Path is a slice of IPs which represents a path through the network
@@ -51,9 +51,9 @@ func (tc *TransportChannel) GetPathTo(destIP net.IP, timeout int) (Path, error) 
 	path := make([]net.IP, 0)
 
 	pathChannelParam := PathChannelParams{
-		destIP: destIP,
+		destIP:           destIP,
 		overrideSourceIP: nil,
-		timeoutMs: timeout,
+		timeoutMs:        timeout,
 	}
 
 	pc, err := tc.GetPathChannelTo(pathChannelParam)
@@ -102,7 +102,7 @@ func (tc *TransportChannel) GetPathFromSourceToDest(sourceIP, destIP net.IP, tim
 
 // GetPathChannelTo returns a PathChannel to a destination IP from the caller
 func (tc *TransportChannel) GetPathChannelTo(params PathChannelParams) (PathChannel, error) {
-	
+
 	if tc.filter != "icmp" {
 		errMsg := fmt.Sprintf("BPF filter must be icmp: got %s instead", tc.filter)
 		return nil, errors.New(errMsg)
@@ -118,7 +118,7 @@ func (tc *TransportChannel) GetPathChannelTo(params PathChannelParams) (PathChan
 	}
 
 	if params.overrideSourceIP != nil {
-		sourceIP = params.overrideSourceIP	 
+		sourceIP = params.overrideSourceIP
 	}
 
 	go func() {
@@ -249,9 +249,9 @@ func (tc *TransportChannel) GetPathChannelFromSourceToDest(sourceIP, destIP net.
 
 	if sourceIP.Equal(localIP) {
 		pathChannelParam := PathChannelParams{
-			destIP: destIP,
+			destIP:           destIP,
 			overrideSourceIP: nil,
-			timeoutMs: timeout,
+			timeoutMs:        timeout,
 		}
 		return tc.GetPathChannelTo(pathChannelParam)
 	}

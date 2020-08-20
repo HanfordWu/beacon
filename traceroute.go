@@ -6,7 +6,7 @@ import (
 )
 
 // Traceroute between specified source and destination devices
-// sourceIP needs to be provided if source device is in a different Autonomous System and source IP cannot be determined automatically 
+// sourceIP needs to be provided if source device is in a different Autonomous System and source IP cannot be determined automatically
 func Traceroute(destinationIP string, sourceIP string, timeoutMs int32, interfaceDevice string) ([]string, error) {
 
 	var timeout int = int(timeoutMs)
@@ -24,7 +24,7 @@ func Traceroute(destinationIP string, sourceIP string, timeoutMs int32, interfac
 	if interfaceDevice == "" {
 		discoveredOutboundInterface, err := GetInterfaceDeviceFromDestIP(destIP)
 		if err != nil {
-			return nil,fmt.Errorf("Failed to find an interface for %s: %s, explicitly provide an interface with -i", destIP.String(), err)
+			return nil, fmt.Errorf("Failed to find an interface for %s: %s, explicitly provide an interface with -i", destIP.String(), err)
 		}
 		interfaceDevice = discoveredOutboundInterface
 	}
@@ -39,9 +39,9 @@ func Traceroute(destinationIP string, sourceIP string, timeoutMs int32, interfac
 	}
 
 	pathChannelParam := PathChannelParams{
-		destIP: destIP,
+		destIP:           destIP,
 		overrideSourceIP: nil,
-		timeoutMs: timeout,
+		timeoutMs:        timeout,
 	}
 
 	if len(sourceIP) > 0 {
@@ -50,7 +50,7 @@ func Traceroute(destinationIP string, sourceIP string, timeoutMs int32, interfac
 
 	pc, err := tc.GetPathChannelTo(pathChannelParam)
 	if err != nil {
-		return nil,err
+		return nil, err
 	}
 
 	hopIdx := 1
@@ -74,7 +74,7 @@ func Traceroute(destinationIP string, sourceIP string, timeoutMs int32, interfac
 			route = append(route, "%s (%s)\n", hostname[0], hop.String())
 		}
 	}
-	
+
 	fmt.Println(route)
 	return route, nil
 }
