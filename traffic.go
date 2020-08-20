@@ -101,7 +101,7 @@ func (tc *TransportChannel) ProbeEachHopOfPathSync(path Path, numPackets int, ti
 			}
 
 			wg.Wait()
-			time.Sleep(time.Duration(timeout) * time.Second)
+			time.Sleep(time.Duration(timeout) * time.Millisecond)
 		}
 	}()
 
@@ -184,7 +184,7 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 	go func() {
 		<-listenerReady
 
-		timeOutDuration := time.Duration(timeout) * time.Second
+		timeOutDuration := time.Duration(timeout) * time.Millisecond
 		timer := time.NewTimer(timeOutDuration)
 
 		txTime := time.Now().UTC()

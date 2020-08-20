@@ -8,6 +8,7 @@ import (
 var reverse bool
 var interfaceDevice string
 var timeout int
+var sourceIP string
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
@@ -22,7 +23,8 @@ var RootCmd = &cobra.Command{
 func initRoot() {
 	RootCmd.Flags().BoolVarP(&reverse, "reverse", "r", false, "trace the route in reverse from target back to caller")
 	RootCmd.PersistentFlags().StringVarP(&interfaceDevice, "interface", "i", "eth0", "outbound interface to use")
-	RootCmd.PersistentFlags().IntVarP(&timeout, "timeout", "t", 3, "time (s) to wait on a packet to return")
+	RootCmd.PersistentFlags().IntVarP(&timeout, "timeout", "t", 3000, "time (millisecond) to wait on a packet to return")
+	RootCmd.PersistentFlags().StringVarP(&sourceIP, "sourceIP", "s", " ", "source IP will be automatically determined if not provided")
 	RootCmd.AddCommand(ProbeCmd)
 }
 
@@ -37,7 +39,7 @@ func rootRun(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	} else {
-		if err := Traceroute(destIP, timeout); err != nil {
+		if err := Traceroute(args[0], sourceIP, int32(timeout), interfaceDevice); err != nil {
 			return err
 		}
 	}

@@ -10,6 +10,12 @@ import (
 	"github.com/google/gopacket/layers"
 )
 
+type PathChannelParams struct {
+	destIP           net.IP
+	overrideSourceIP net.IP
+	timeoutMs        int
+}
+
 // Path is a slice of IPs which represents a path through the network
 type Path []net.IP
 
@@ -44,7 +50,13 @@ type PathChannel chan net.IP
 func (tc *TransportChannel) GetPathTo(destIP net.IP, timeout int) (Path, error) {
 	path := make([]net.IP, 0)
 
-	pc, err := tc.GetPathChannelTo(destIP, timeout)
+	pathChannelParam := PathChannelParams{
+		destIP:           destIP,
+		overrideSourceIP: nil,
+		timeoutMs:        timeout,
+	}
+
+	pc, err := tc.GetPathChannelTo(pathChannelParam)
 	if err != nil {
 		return path, err
 	}
@@ -89,7 +101,8 @@ func (tc *TransportChannel) GetPathFromSourceToDest(sourceIP, destIP net.IP, tim
 }
 
 // GetPathChannelTo returns a PathChannel to a destination IP from the caller
-func (tc *TransportChannel) GetPathChannelTo(destIP net.IP, timeout int) (PathChannel, error) {
+func (tc *TransportChannel) GetPathChannelTo(params PathChannelParams) (PathChannel, error) {
+
 	if tc.filter != "icmp" {
 		errMsg := fmt.Sprintf("BPF filter must be icmp: got %s instead", tc.filter)
 		return nil, errors.New(errMsg)
@@ -104,21 +117,25 @@ func (tc *TransportChannel) GetPathChannelTo(destIP net.IP, timeout int) (PathCh
 		return pathChan, err
 	}
 
+	if params.overrideSourceIP != nil {
+		sourceIP = params.overrideSourceIP
+	}
+
 	go func() {
 		defer close(pathChan)
 		buf := gopacket.NewSerializeBuffer()
 
 		var ttl uint8
 		for ttl = 1; ttl <= 32; ttl++ {
-			err = buildICMPTraceroutePacket(sourceIP, destIP, ttl, []byte("Hello"), buf)
+			err = buildICMPTraceroutePacket(sourceIP, params.destIP, ttl, []byte("Hello"), buf)
 			if err != nil {
 				done <- err
 			}
-			tc.SendTo(buf.Bytes(), destIP)
+			tc.SendTo(buf.Bytes(), params.destIP)
 			select {
 			case ip := <-found:
 				pathChan <- ip
-			case <-time.After(time.Duration(timeout) * time.Second):
+			case <-time.After(time.Duration(params.timeoutMs) * time.Millisecond):
 				pathChan <- nil
 			case <-done:
 				return
@@ -136,7 +153,7 @@ func (tc *TransportChannel) GetPathChannelTo(destIP net.IP, timeout int) (PathCh
 			// fmt.Printf("%s -> %s : %s\n", ip4.SrcIP, ip4.DstIP, icmp.TypeCode)
 			if int(icmp.TypeCode) == icmpTTLExceeded && ip4.DstIP.Equal(sourceIP) {
 				found <- ip4.SrcIP
-			} else if int(icmp.TypeCode) == icmpEchoReply && ip4.SrcIP.Equal(destIP) {
+			} else if int(icmp.TypeCode) == icmpEchoReply && ip4.SrcIP.Equal(params.destIP) {
 				found <- ip4.SrcIP
 				done <- nil
 				return
@@ -184,7 +201,7 @@ func (tc *TransportChannel) GetPathChannelFrom(destIP net.IP, timeout int) (Path
 			select {
 			case ip := <-found:
 				pathChan <- ip
-			case <-time.After(time.Duration(timeout) * time.Second):
+			case <-time.After(time.Duration(timeout) * time.Millisecond):
 				pathChan <- nil
 			case <-done:
 				return
@@ -229,8 +246,14 @@ func (tc *TransportChannel) GetPathChannelFromSourceToDest(sourceIP, destIP net.
 	if err != nil {
 		return pathChan, err
 	}
+
 	if sourceIP.Equal(localIP) {
-		return tc.GetPathChannelTo(destIP, timeout)
+		pathChannelParam := PathChannelParams{
+			destIP:           destIP,
+			overrideSourceIP: nil,
+			timeoutMs:        timeout,
+		}
+		return tc.GetPathChannelTo(pathChannelParam)
 	}
 
 	go func() {
@@ -247,7 +270,7 @@ func (tc *TransportChannel) GetPathChannelFromSourceToDest(sourceIP, destIP net.
 			select {
 			case ip := <-found:
 				pathChan <- ip
-			case <-time.After(time.Duration(timeout) * time.Second):
+			case <-time.After(time.Duration(timeout) * time.Millisecond):
 				pathChan <- nil
 			case <-done:
 				return
