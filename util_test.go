@@ -24,10 +24,15 @@ func TestParseIPFromName(t *testing.T) {
 	ipString := "localhost"
 
 	expected := net.IP{127, 0, 0, 1}
+
 	actual, err := ParseIPFromString(ipString)
 	if err != nil {
 		t.Errorf("Error parsing ip string: %s", ipString)
 		t.FailNow()
+	}
+
+	if actual.Equal(net.IPv6loopback) {
+		return
 	}
 
 	if !expected.Equal(actual) {
