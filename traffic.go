@@ -182,6 +182,7 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 
 	// tx goroutine
 	go func() {
+		defer tc.UnregisterListener(listener)
 		<-listenerReady
 
 		timeOutDuration := time.Duration(timeout) * time.Millisecond
@@ -206,7 +207,6 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 			result.Payload.TxTimestamp = txTime
 			resultChan <- result
 		case <-timer.C:
-			tc.UnregisterListener(listener)
 			resultChan <- BoomerangResult{
 				Payload: BoomerangPayload{
 					DestIP:      path[len(path)-1],
