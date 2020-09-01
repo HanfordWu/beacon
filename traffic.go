@@ -184,7 +184,7 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 	go func() {
 		<-listenerReady
 
-		timeOutDuration := time.Duration(timeout) * time.Millisecond
+		timeOutDuration := time.Duration(timeout) * time.Second
 		timer := time.NewTimer(timeOutDuration)
 
 		txTime := time.Now().UTC()
