@@ -73,6 +73,7 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 		snaplen:     4800,
 		bufferSize:  16 * 1024 * 1024,
 		filter:      "",
+		timeout:     100,
 		listenerMap: NewListenerMap(),
 	}
 
@@ -91,6 +92,8 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 	} else if err := inactive.SetSnapLen(tc.snaplen); err != nil {
 		return nil, err
 	} else if err := inactive.SetBufferSize(tc.bufferSize); err != nil {
+		return nil, err
+    } else if err := inactive.SetTimeout(time.Millisecond * -time.Duration(tc.timeout)); err != nil { // set negative timeout, mechanics described here: https://godoc.org/github.com/google/gopacket/pcap#hdr-PCAP_Timeouts
 		return nil, err
 	}
 
