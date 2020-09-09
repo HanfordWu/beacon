@@ -93,7 +93,7 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 		return nil, err
 	} else if err := inactive.SetBufferSize(tc.bufferSize); err != nil {
 		return nil, err
-    } else if err := inactive.SetTimeout(time.Millisecond * -time.Duration(tc.timeout)); err != nil { // set negative timeout, mechanics described here: https://godoc.org/github.com/google/gopacket/pcap#hdr-PCAP_Timeouts
+	} else if err := inactive.SetTimeout(time.Millisecond * -time.Duration(tc.timeout)); err != nil { // set negative timeout, mechanics described here: https://godoc.org/github.com/google/gopacket/pcap#hdr-PCAP_Timeouts
 		return nil, err
 	}
 
