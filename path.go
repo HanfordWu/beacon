@@ -108,54 +108,88 @@ func (tc *TransportChannel) GetPathChannelTo(params PathChannelParams) (PathChan
 		return nil, errors.New(errMsg)
 	}
 
+	fmt.Printf("transport channel is using interface: %s\n", tc.deviceName)
+
 	pathChan := make(PathChannel)
 	found := make(chan net.IP)
 	done := make(chan error)
 
-	sourceIP, err := tc.FindLocalIP()
+	sourceIP, err := tc.FindSourceIPForDest(params.destIP)
 	if err != nil {
 		return pathChan, err
 	}
+
+	fmt.Printf("using sourceIP: %s\n", sourceIP)
 
 	if params.overrideSourceIP != nil {
 		sourceIP = params.overrideSourceIP
 	}
 
-	go func() {
-		defer close(pathChan)
-		buf := gopacket.NewSerializeBuffer()
+	listenerReady := make(chan bool)
+	listenerReadySignalSent := false
 
-		var ttl uint8
-		for ttl = 1; ttl <= 32; ttl++ {
-			err = buildICMPTraceroutePacket(sourceIP, params.destIP, ttl, []byte("Hello"), buf)
-			if err != nil {
-				done <- err
+	go func() {
+		for packet := range tc.rx() {
+			if !listenerReadySignalSent {
+				listenerReady <- true
+				fmt.Println("sent listener ready signal")
+				listenerReadySignalSent = true
 			}
-			tc.SendTo(buf.Bytes(), params.destIP)
-			select {
-			case ip := <-found:
-				pathChan <- ip
-			case <-time.After(time.Duration(params.timeoutMs) * time.Millisecond):
-				pathChan <- nil
-			case <-done:
+			icmpLayer := packet.Layer(layers.LayerTypeICMPv4)
+			ipv4Layer := packet.Layer(layers.LayerTypeIPv4)
+			icmp, _ := icmpLayer.(*layers.ICMPv4)
+			ip4, _ := ipv4Layer.(*layers.IPv4)
+
+			fmt.Printf("%s -> %s : %s\n", ip4.SrcIP, ip4.DstIP, icmp.TypeCode)
+			if int(icmp.TypeCode) == icmpTTLExceeded && ip4.DstIP.Equal(sourceIP) {
+				found <- ip4.SrcIP
+			} else if int(icmp.TypeCode) == icmpPortUnreachable && !ip4.SrcIP.Equal(net.IP{127, 0, 0, 1}) {
+				found <- ip4.SrcIP
+				found <- params.destIP
+				done <- nil
 				return
 			}
 		}
 	}()
 
 	go func() {
-		for packet := range tc.rx() {
-			icmpLayer := packet.Layer(layers.LayerTypeICMPv4)
-			ipv4Layer := packet.Layer(layers.LayerTypeIPv4)
-			icmp, _ := icmpLayer.(*layers.ICMPv4)
-			ip4, _ := ipv4Layer.(*layers.IPv4)
+		bogusBuf := gopacket.NewSerializeBuffer()
+		err = buildUDPTraceroutePacket(sourceIP, params.destIP, 2, []byte("Hello"), bogusBuf)
+		if err != nil {
+			fmt.Println(err)
+			done <- err
+		}
 
-			// fmt.Printf("%s -> %s : %s\n", ip4.SrcIP, ip4.DstIP, icmp.TypeCode)
-			if int(icmp.TypeCode) == icmpTTLExceeded && ip4.DstIP.Equal(sourceIP) {
-				found <- ip4.SrcIP
-			} else if int(icmp.TypeCode) == icmpEchoReply && ip4.SrcIP.Equal(params.destIP) {
-				found <- ip4.SrcIP
-				done <- nil
+		err := tc.SendTo(bogusBuf.Bytes(), params.destIP)
+		if err != nil {
+			fmt.Printf("error sending packet: %s", err)
+		}
+
+		// wait for listener to be ready to recv
+		<-listenerReady
+
+		defer close(pathChan)
+		buf := gopacket.NewSerializeBuffer()
+
+		var ttl uint8
+		for ttl = 1; ttl <= 32; ttl++ {
+			err = buildUDPTraceroutePacket(sourceIP, params.destIP, ttl, []byte("Hello"), buf)
+			if err != nil {
+				fmt.Println(err)
+				done <- err
+			}
+
+			err := tc.SendTo(buf.Bytes(), params.destIP)
+			if err != nil {
+				fmt.Printf("error sending packet: %s", err)
+			}
+
+			select {
+			case ip := <-found:
+				pathChan <- ip
+			case <-time.After(time.Duration(params.timeoutMs) * time.Millisecond):
+				pathChan <- nil
+			case <-done:
 				return
 			}
 		}
@@ -257,6 +291,23 @@ func (tc *TransportChannel) GetPathChannelFromSourceToDest(sourceIP, destIP net.
 	}
 
 	go func() {
+		for packet := range tc.rx() {
+			icmpLayer := packet.Layer(layers.LayerTypeICMPv4)
+			ipv4Layer := packet.Layer(layers.LayerTypeIPv4)
+			icmp, _ := icmpLayer.(*layers.ICMPv4)
+			ip4, _ := ipv4Layer.(*layers.IPv4)
+
+			if int(icmp.TypeCode) == icmpTTLExceeded && ip4.DstIP.Equal(localIP) {
+				found <- ip4.SrcIP
+			} else if int(icmp.TypeCode) == icmpEchoReply && ip4.SrcIP.Equal(destIP) {
+				found <- ip4.SrcIP
+				done <- nil
+				return
+			}
+		}
+	}()
+
+	go func() {
 		defer close(pathChan)
 		var ttl uint8
 		for ttl = 1; ttl <= 32; ttl++ {
@@ -273,23 +324,6 @@ func (tc *TransportChannel) GetPathChannelFromSourceToDest(sourceIP, destIP net.
 			case <-time.After(time.Duration(timeout) * time.Millisecond):
 				pathChan <- nil
 			case <-done:
-				return
-			}
-		}
-	}()
-
-	go func() {
-		for packet := range tc.rx() {
-			icmpLayer := packet.Layer(layers.LayerTypeICMPv4)
-			ipv4Layer := packet.Layer(layers.LayerTypeIPv4)
-			icmp, _ := icmpLayer.(*layers.ICMPv4)
-			ip4, _ := ipv4Layer.(*layers.IPv4)
-
-			if int(icmp.TypeCode) == icmpTTLExceeded && ip4.DstIP.Equal(localIP) {
-				found <- ip4.SrcIP
-			} else if int(icmp.TypeCode) == icmpEchoReply && ip4.SrcIP.Equal(destIP) {
-				found <- ip4.SrcIP
-				done <- nil
 				return
 			}
 		}

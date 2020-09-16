@@ -32,6 +32,7 @@ func Traceroute(destinationIP string, sourceIP string, timeoutMs int32, interfac
 	tc, err := NewTransportChannel(
 		WithBPFFilter("icmp"),
 		WithInterface(interfaceDevice),
+		WithTimeout(100),
 	)
 
 	if err != nil {
@@ -75,6 +76,5 @@ func Traceroute(destinationIP string, sourceIP string, timeoutMs int32, interfac
 		}
 	}
 
-	fmt.Println(route)
 	return route, nil
 }

@@ -36,12 +36,12 @@ func buildIPv4ICMPLayer(sourceIP, destIP net.IP, ttl uint8) *layers.IPv4 {
 	return ipLayer
 }
 
-func buildUDPLayer(sourceIP, destIP net.IP) *layers.IPv4 {
+func buildIPv4UDPLayer(sourceIP, destIP net.IP, ttl uint8) *layers.IPv4 {
 	ipLayer := &layers.IPv4{
 		Version:  4,
 		IHL:      5,
 		Flags:    layers.IPv4DontFragment,
-		TTL:      255,
+		TTL:      ttl,
 		Protocol: layers.IPProtocolUDP,
 		SrcIP:    sourceIP,
 		DstIP:    destIP,
@@ -66,6 +66,31 @@ func buildICMPTraceroutePacket(sourceIP, destIP net.IP, ttl uint8, payload []byt
 	err := gopacket.SerializeLayers(buf, opts,
 		ipLayer,
 		icmpLayer,
+		gopacket.Payload(payload),
+	)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func buildUDPTraceroutePacket(sourceIP, destIP net.IP, ttl uint8, payload []byte, buf gopacket.SerializeBuffer) error {
+	opts := gopacket.SerializeOptions{
+		ComputeChecksums: true,
+		FixLengths:       true,
+	}
+
+	ipLayer := buildIPv4UDPLayer(sourceIP, destIP, ttl)
+
+	udpLayer := &layers.UDP{
+		SrcPort: 53576,
+		DstPort: 33437,
+	}
+	udpLayer.SetNetworkLayerForChecksum(ipLayer)
+
+	err := gopacket.SerializeLayers(buf, opts,
+		ipLayer,
+		udpLayer,
 		gopacket.Payload(payload),
 	)
 	if err != nil {
@@ -123,7 +148,7 @@ func CreateRoundTripPacketForPath(path Path, payload []byte, buf gopacket.Serial
 		constructedLayers[numLayers-idx-1] = buildIPIPLayer(hopB, hopA)
 	}
 
-	ipLayer := buildUDPLayer(path[1], path[0])
+	ipLayer := buildIPv4UDPLayer(path[1], path[0], 255)
 	constructedLayers = append(constructedLayers, ipLayer)
 
 	udpLayer := &layers.UDP{

@@ -10,9 +10,11 @@ import (
 func Traceroute(destIP string, sourceIP string, timeout int32, interfaceDevice string) error {
 
 	response, err := beacon.Traceroute(destIP, sourceIP, timeout, interfaceDevice)
+	if err != nil {
+		return err
+	}
 
-	fmt.Printf("%v", response)
-	fmt.Printf("%v", err)
+	fmt.Println(response)
 
 	return nil
 }

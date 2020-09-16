@@ -93,7 +93,7 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 		return nil, err
 	} else if err := inactive.SetBufferSize(tc.bufferSize); err != nil {
 		return nil, err
-	} else if err := inactive.SetTimeout(time.Millisecond * -time.Duration(tc.timeout)); err != nil { // set negative timeout, mechanics described here: https://godoc.org/github.com/google/gopacket/pcap#hdr-PCAP_Timeouts
+	} else if err := inactive.SetTimeout(time.Millisecond * time.Duration(tc.timeout)); err != nil { // set negative timeout, mechanics described here: https://godoc.org/github.com/google/gopacket/pcap#hdr-PCAP_Timeouts
 		return nil, err
 	}
 
@@ -238,4 +238,9 @@ func (tc *TransportChannel) FindLocalIP() (net.IP, error) {
 	}
 
 	return eth0Device.Addresses[0].IP, nil
+}
+
+// FindLocalIP finds the IP of the interface device of the TransportChannel instance
+func (tc *TransportChannel) FindSourceIPForDest(dest net.IP) (net.IP, error) {
+	return net.IP{13, 106, 238, 181}, nil
 }
