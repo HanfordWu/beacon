@@ -119,12 +119,14 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 	}
 	tc.socketFD = fd
 
-	// activate listeners
-	go func() {
-		for packet := range tc.rx() {
-			go tc.listenerMap.Run(packet)
-		}
-	}()
+	/*
+		// activate listeners
+		go func() {
+			for packet := range tc.Rx() {
+				go tc.listenerMap.Run(packet)
+			}
+		}()
+	*/
 
 	return tc, nil
 }
@@ -138,9 +140,9 @@ func (tc *TransportChannel) Stats() string {
 	return fmt.Sprintf("%+v", stats)
 }
 
-// rx returns a packet channel over which packets will be pushed onto
+// Rx returns a packet channel over which packets will be pushed onto
 // this method is private to prevent users from interfering with the listeners
-func (tc *TransportChannel) rx() chan gopacket.Packet {
+func (tc *TransportChannel) Rx() chan gopacket.Packet {
 	// return tc.packetSource.Packets()
 	if tc.packets == nil {
 		tc.packets = make(chan gopacket.Packet, 1000000)
@@ -238,6 +240,20 @@ func (tc *TransportChannel) FindLocalIP() (net.IP, error) {
 	}
 
 	return eth0Device.Addresses[0].IP, nil
+}
+
+// Interface returns the interface the TransportChannel is listening on
+func (tc *TransportChannel) Interface() string {
+	return tc.deviceName
+}
+
+// Filter returns the BPF the TransportChannel uses
+func (tc *TransportChannel) Filter() string {
+	return tc.filter
+}
+
+func (tc *TransportChannel) Version() string {
+	return pcap.Version()
 }
 
 // FindLocalIP finds the IP of the interface device of the TransportChannel instance

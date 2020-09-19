@@ -23,7 +23,7 @@ var RootCmd = &cobra.Command{
 func initRoot() {
 	RootCmd.Flags().BoolVarP(&reverse, "reverse", "r", false, "trace the route in reverse from target back to caller")
 	RootCmd.PersistentFlags().StringVarP(&interfaceDevice, "interface", "i", "eth0", "outbound interface to use")
-	RootCmd.PersistentFlags().IntVarP(&timeout, "timeout", "t", 3000, "time (millisecond) to wait on a packet to return")
+	RootCmd.PersistentFlags().IntVarP(&timeout, "timeout", "t", 3, "time (second) to wait on a packet to return")
 	RootCmd.PersistentFlags().StringVarP(&source, "source", "s", "", "source IP/host (defaults to eth0 interface)")
 	RootCmd.AddCommand(ProbeCmd)
 }

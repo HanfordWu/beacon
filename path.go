@@ -10,12 +10,6 @@ import (
 	"github.com/google/gopacket/layers"
 )
 
-type PathChannelParams struct {
-	destIP           net.IP
-	overrideSourceIP net.IP
-	timeoutMs        int
-}
-
 // Path is a slice of IPs which represents a path through the network
 type Path []net.IP
 
@@ -50,13 +44,7 @@ type PathChannel chan net.IP
 func (tc *TransportChannel) GetPathTo(destIP net.IP, timeout int) (Path, error) {
 	path := make([]net.IP, 0)
 
-	pathChannelParam := PathChannelParams{
-		destIP:           destIP,
-		overrideSourceIP: nil,
-		timeoutMs:        timeout,
-	}
-
-	pc, err := tc.GetPathChannelTo(pathChannelParam)
+	pc, err := tc.GetPathChannelTo(destIP, nil, timeout)
 	if err != nil {
 		return path, err
 	}
@@ -101,7 +89,7 @@ func (tc *TransportChannel) GetPathFromSourceToDest(sourceIP, destIP net.IP, tim
 }
 
 // GetPathChannelTo returns a PathChannel to a destination IP from the caller
-func (tc *TransportChannel) GetPathChannelTo(params PathChannelParams) (PathChannel, error) {
+func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout int) (PathChannel, error) {
 
 	if tc.filter != "icmp" {
 		errMsg := fmt.Sprintf("BPF filter must be icmp: got %s instead", tc.filter)
@@ -114,27 +102,15 @@ func (tc *TransportChannel) GetPathChannelTo(params PathChannelParams) (PathChan
 	found := make(chan net.IP)
 	done := make(chan error)
 
-	sourceIP, err := tc.FindSourceIPForDest(params.destIP)
+	sourceIP, err := tc.FindSourceIPForDest(destIP)
 	if err != nil {
 		return pathChan, err
 	}
 
 	fmt.Printf("using sourceIP: %s\n", sourceIP)
 
-	if params.overrideSourceIP != nil {
-		sourceIP = params.overrideSourceIP
-	}
-
-	listenerReady := make(chan bool)
-	listenerReadySignalSent := false
-
 	go func() {
-		for packet := range tc.rx() {
-			if !listenerReadySignalSent {
-				listenerReady <- true
-				fmt.Println("sent listener ready signal")
-				listenerReadySignalSent = true
-			}
+		for packet := range tc.Rx() {
 			icmpLayer := packet.Layer(layers.LayerTypeICMPv4)
 			ipv4Layer := packet.Layer(layers.LayerTypeIPv4)
 			icmp, _ := icmpLayer.(*layers.ICMPv4)
@@ -145,7 +121,7 @@ func (tc *TransportChannel) GetPathChannelTo(params PathChannelParams) (PathChan
 				found <- ip4.SrcIP
 			} else if int(icmp.TypeCode) == icmpPortUnreachable && !ip4.SrcIP.Equal(net.IP{127, 0, 0, 1}) {
 				found <- ip4.SrcIP
-				found <- params.destIP
+				found <- destIP
 				done <- nil
 				return
 			}
@@ -153,33 +129,20 @@ func (tc *TransportChannel) GetPathChannelTo(params PathChannelParams) (PathChan
 	}()
 
 	go func() {
-		bogusBuf := gopacket.NewSerializeBuffer()
-		err = buildUDPTraceroutePacket(sourceIP, params.destIP, 2, []byte("Hello"), bogusBuf)
-		if err != nil {
-			fmt.Println(err)
-			done <- err
-		}
-
-		err := tc.SendTo(bogusBuf.Bytes(), params.destIP)
-		if err != nil {
-			fmt.Printf("error sending packet: %s", err)
-		}
-
 		// wait for listener to be ready to recv
-		<-listenerReady
 
 		defer close(pathChan)
 		buf := gopacket.NewSerializeBuffer()
 
 		var ttl uint8
 		for ttl = 1; ttl <= 32; ttl++ {
-			err = buildUDPTraceroutePacket(sourceIP, params.destIP, ttl, []byte("Hello"), buf)
+			err = buildUDPTraceroutePacket(sourceIP, destIP, ttl, []byte("Hello"), buf)
 			if err != nil {
 				fmt.Println(err)
 				done <- err
 			}
 
-			err := tc.SendTo(buf.Bytes(), params.destIP)
+			err := tc.SendTo(buf.Bytes(), destIP)
 			if err != nil {
 				fmt.Printf("error sending packet: %s", err)
 			}
@@ -187,7 +150,7 @@ func (tc *TransportChannel) GetPathChannelTo(params PathChannelParams) (PathChan
 			select {
 			case ip := <-found:
 				pathChan <- ip
-			case <-time.After(time.Duration(params.timeoutMs) * time.Millisecond):
+			case <-time.After(time.Duration(timeout) * time.Second):
 				pathChan <- nil
 			case <-done:
 				return
@@ -244,7 +207,7 @@ func (tc *TransportChannel) GetPathChannelFrom(destIP net.IP, timeout int) (Path
 	}()
 
 	go func() {
-		for packet := range tc.rx() {
+		for packet := range tc.Rx() {
 			// TODO: consider using DecodingLayerParser https://godoc.org/github.com/google/gopacket#hdr-Fast_Decoding_With_DecodingLayerParser
 			icmpLayer := packet.Layer(layers.LayerTypeICMPv4)
 			ipv4Layer := packet.Layer(layers.LayerTypeIPv4)
@@ -282,16 +245,11 @@ func (tc *TransportChannel) GetPathChannelFromSourceToDest(sourceIP, destIP net.
 	}
 
 	if sourceIP.Equal(localIP) {
-		pathChannelParam := PathChannelParams{
-			destIP:           destIP,
-			overrideSourceIP: nil,
-			timeoutMs:        timeout,
-		}
-		return tc.GetPathChannelTo(pathChannelParam)
+		return tc.GetPathChannelTo(destIP, nil, timeout)
 	}
 
 	go func() {
-		for packet := range tc.rx() {
+		for packet := range tc.Rx() {
 			icmpLayer := packet.Layer(layers.LayerTypeICMPv4)
 			ipv4Layer := packet.Layer(layers.LayerTypeIPv4)
 			icmp, _ := icmpLayer.(*layers.ICMPv4)

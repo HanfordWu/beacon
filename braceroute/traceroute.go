@@ -9,7 +9,9 @@ import (
 // Traceroute performs traditional traceroute
 func Traceroute(destIP string, sourceIP string, timeout int32, interfaceDevice string) error {
 
-	response, err := beacon.Traceroute(destIP, sourceIP, timeout, interfaceDevice)
+	timeoutInt := int(timeout)
+
+	response, err := beacon.Traceroute(destIP, sourceIP, timeoutInt, interfaceDevice)
 	if err != nil {
 		return err
 	}
