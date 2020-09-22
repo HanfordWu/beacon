@@ -40,6 +40,12 @@ func (p Path) Equal(other Path) bool {
 // PathChannel is the channel version of a Path
 type PathChannel chan net.IP
 
+// PathTerminator contains the second to last and last IPs of a path
+type PathTerminator struct {
+	lastIP         net.IP
+	secondToLastIP net.IP
+}
+
 // GetPathTo returns a Path to a destination IP from the caller
 func (tc *TransportChannel) GetPathTo(destIP net.IP, timeout int) (Path, error) {
 	path := make([]net.IP, 0)
@@ -100,14 +106,12 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 
 	pathChan := make(PathChannel)
 	found := make(chan net.IP)
-	done := make(chan error)
+	done := make(chan PathTerminator)
 
 	sourceIP, err := tc.FindSourceIPForDest(destIP)
 	if err != nil {
 		return pathChan, err
 	}
-
-	fmt.Printf("using sourceIP: %s\n", sourceIP)
 
 	go func() {
 		for packet := range tc.Rx() {
@@ -121,8 +125,11 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 				found <- ip4.SrcIP
 			} else if int(icmp.TypeCode) == icmpPortUnreachable && !ip4.SrcIP.Equal(net.IP{127, 0, 0, 1}) {
 				found <- ip4.SrcIP
-				found <- destIP
-				done <- nil
+			} else if int(icmp.TypeCode) == icmpPortUnreachable && ip4.DstIP.Equal(finalSourceIP) {
+				done <- PathTerminator{
+					secondToLastIP: ip4.SrcIP,
+					lastIP:         destIP,
+				}
 				return
 			}
 		}
@@ -152,7 +159,9 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 				pathChan <- ip
 			case <-time.After(time.Duration(timeout) * time.Second):
 				pathChan <- nil
-			case <-done:
+			case term := <-done:
+				pathChan <- term.secondToLastIP
+				pathChan <- term.lastIP
 				return
 			}
 		}
