@@ -108,22 +108,26 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 	found := make(chan net.IP)
 	done := make(chan PathTerminator)
 
-	sourceIP, err := tc.FindSourceIPForDest(destIP)
-	if err != nil {
-		return pathChan, err
+	var finalSourceIP net.IP
+	if sourceIP == nil {
+		foundSourceIP, err := tc.FindSourceIPForDest(destIP)
+		if err != nil {
+			return pathChan, err
+		}
+		finalSourceIP = foundSourceIP
+	} else {
+		finalSourceIP = sourceIP
 	}
 
 	go func() {
-		for packet := range tc.Rx() {
+		for packet := range tc.rx() {
 			icmpLayer := packet.Layer(layers.LayerTypeICMPv4)
 			ipv4Layer := packet.Layer(layers.LayerTypeIPv4)
 			icmp, _ := icmpLayer.(*layers.ICMPv4)
 			ip4, _ := ipv4Layer.(*layers.IPv4)
 
-			fmt.Printf("%s -> %s : %s\n", ip4.SrcIP, ip4.DstIP, icmp.TypeCode)
-			if int(icmp.TypeCode) == icmpTTLExceeded && ip4.DstIP.Equal(sourceIP) {
-				found <- ip4.SrcIP
-			} else if int(icmp.TypeCode) == icmpPortUnreachable && !ip4.SrcIP.Equal(net.IP{127, 0, 0, 1}) {
+			// fmt.Printf("%s -> %s : %s\n", ip4.SrcIP, ip4.DstIP, icmp.TypeCode)
+			if int(icmp.TypeCode) == icmpTTLExceeded && ip4.DstIP.Equal(finalSourceIP) {
 				found <- ip4.SrcIP
 			} else if int(icmp.TypeCode) == icmpPortUnreachable && ip4.DstIP.Equal(finalSourceIP) {
 				done <- PathTerminator{
@@ -137,19 +141,17 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 
 	go func() {
 		// wait for listener to be ready to recv
-
 		defer close(pathChan)
 		buf := gopacket.NewSerializeBuffer()
 
 		var ttl uint8
 		for ttl = 1; ttl <= 32; ttl++ {
-			err = buildUDPTraceroutePacket(sourceIP, destIP, ttl, []byte("Hello"), buf)
+			err := buildUDPTraceroutePacket(finalSourceIP, destIP, ttl, []byte("Hello"), buf)
 			if err != nil {
-				fmt.Println(err)
-				done <- err
+				fmt.Printf("Failed to build udp tracert packet: %s\n", err)
 			}
 
-			err := tc.SendTo(buf.Bytes(), destIP)
+			err = tc.SendTo(buf.Bytes(), destIP)
 			if err != nil {
 				fmt.Printf("error sending packet: %s", err)
 			}
@@ -216,7 +218,7 @@ func (tc *TransportChannel) GetPathChannelFrom(destIP net.IP, timeout int) (Path
 	}()
 
 	go func() {
-		for packet := range tc.Rx() {
+		for packet := range tc.rx() {
 			// TODO: consider using DecodingLayerParser https://godoc.org/github.com/google/gopacket#hdr-Fast_Decoding_With_DecodingLayerParser
 			icmpLayer := packet.Layer(layers.LayerTypeICMPv4)
 			ipv4Layer := packet.Layer(layers.LayerTypeIPv4)
@@ -258,7 +260,7 @@ func (tc *TransportChannel) GetPathChannelFromSourceToDest(sourceIP, destIP net.
 	}
 
 	go func() {
-		for packet := range tc.Rx() {
+		for packet := range tc.rx() {
 			icmpLayer := packet.Layer(layers.LayerTypeICMPv4)
 			ipv4Layer := packet.Layer(layers.LayerTypeIPv4)
 			icmp, _ := icmpLayer.(*layers.ICMPv4)

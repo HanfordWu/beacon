@@ -25,6 +25,7 @@ type TransportChannel struct {
 	bufferSize   int
 	filter       string
 	timeout      int
+	useListeners bool
 }
 
 // TransportChannelOption modifies a TransportChannel struct
@@ -67,14 +68,22 @@ func WithBufferSize(bufferSize int) TransportChannelOption {
 	}
 }
 
+// UseListeners sets up the TransportChannel for listener use or not
+func UseListeners(useListeners bool) TransportChannelOption {
+	return func(tc *TransportChannel) {
+		tc.useListeners = useListeners
+	}
+}
+
 // NewTransportChannel instantiates a new transport chanel
 func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, error) {
 	tc := &TransportChannel{
-		snaplen:     4800,
-		bufferSize:  16 * 1024 * 1024,
-		filter:      "",
-		timeout:     100,
-		listenerMap: NewListenerMap(),
+		snaplen:      4800,
+		bufferSize:   16 * 1024 * 1024,
+		filter:       "",
+		timeout:      100,
+		listenerMap:  NewListenerMap(),
+		useListeners: true,
 	}
 
 	for _, opt := range options {
@@ -119,14 +128,14 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 	}
 	tc.socketFD = fd
 
-	/*
+	if tc.useListeners {
 		// activate listeners
 		go func() {
-			for packet := range tc.Rx() {
+			for packet := range tc.rx() {
 				go tc.listenerMap.Run(packet)
 			}
 		}()
-	*/
+	}
 
 	return tc, nil
 }
@@ -140,9 +149,9 @@ func (tc *TransportChannel) Stats() string {
 	return fmt.Sprintf("%+v", stats)
 }
 
-// Rx returns a packet channel over which packets will be pushed onto
+// rx returns a packet channel over which packets will be pushed onto
 // this method is private to prevent users from interfering with the listeners
-func (tc *TransportChannel) Rx() chan gopacket.Packet {
+func (tc *TransportChannel) rx() chan gopacket.Packet {
 	// return tc.packetSource.Packets()
 	if tc.packets == nil {
 		tc.packets = make(chan gopacket.Packet, 1000000)
