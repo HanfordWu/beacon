@@ -162,6 +162,10 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 			case <-time.After(time.Duration(timeout) * time.Second):
 				pathChan <- nil
 			case term := <-done:
+				if term.lastIP.Equal(term.secondToLastIP) {
+					pathChan <- term.lastIP
+					return
+				}
 				pathChan <- term.secondToLastIP
 				pathChan <- term.lastIP
 				return

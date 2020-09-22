@@ -80,6 +80,7 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 	tc := &TransportChannel{
 		snaplen:      4800,
 		bufferSize:   16 * 1024 * 1024,
+		deviceName:   "any",
 		filter:       "",
 		timeout:      100,
 		listenerMap:  NewListenerMap(),
@@ -267,5 +268,13 @@ func (tc *TransportChannel) Version() string {
 
 // FindLocalIP finds the IP of the interface device of the TransportChannel instance
 func (tc *TransportChannel) FindSourceIPForDest(dest net.IP) (net.IP, error) {
-	return net.IP{13, 106, 238, 181}, nil
+	conn, err := net.Dial("udp", fmt.Sprintf("%s:80", dest))
+	if err != nil {
+		return nil, fmt.Errorf("Failed to dial dest ip %s: %s", dest, err)
+	}
+	defer conn.Close()
+
+	sourceIP := conn.LocalAddr().(*net.UDPAddr).IP
+
+	return sourceIP, nil
 }
