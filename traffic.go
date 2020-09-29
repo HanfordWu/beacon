@@ -53,6 +53,36 @@ func (b *BoomerangResult) IsFatal() bool {
 	return b.ErrorType == fatal
 }
 
+// DiscoverAndProbe first runs a traceroute from source to destination, then probes packets over the discovered path.
+func (tc *TransportChannel) DiscoverAndProbe(src, dst net.IP, numPackets, timeout int) <-chan BoomerangResult {
+
+    tracerouteTC, err := NewTransportChannel(
+        WithInterface("any"),
+        WithBPFFilter("icmp"),
+        UseListeners(false),
+    )
+    if err != nil {
+        panic(err)
+    }
+
+    path, err := tracerouteTC.GetPathTo(dst, 3)
+    if err != nil {
+        panic(err)
+    }
+
+    tracerouteTC.Close()
+
+    prePath := []net.IP{
+        {13,106,165,163},
+        {13,106,165,162},
+    }
+
+    path = append(prePath, path...)
+    fmt.Printf("found path: %v\n", path)
+
+    return tc.ProbeEachHopOfPath(path, numPackets, timeout)
+}
+
 // ProbeEachHopOfPath probes each hop in a path, but accepts a transport channel as an argument.  This allows the caller to share
 // one transport channel between many calls to Probe.  The supplied tranport channel must have a BPFFilter of "ip proto 4"
 func (tc *TransportChannel) ProbeEachHopOfPath(path Path, numPackets int, timeout int) <-chan BoomerangResult {

@@ -66,7 +66,7 @@ func Traceroute(destinationIP string, sourceIP string, timeout int, interfaceDev
 
 		} else {
 			fmt.Printf("%s (%s)\n", hostname[0], hop.String())
-			route = append(route, "%s (%s)\n", hostname[0], hop.String())
+			route = append(route, fmt.Sprintf("%s (%s)\n", hostname[0], hop.String()))
 		}
 	}
 
