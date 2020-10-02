@@ -266,7 +266,7 @@ func (tc *TransportChannel) Version() string {
 	return pcap.Version()
 }
 
-// FindLocalIP finds the IP of the interface device of the TransportChannel instance
+// FindSourceIPForDest finds the IP of the interface device of the TransportChannel instance
 func (tc *TransportChannel) FindSourceIPForDest(dest net.IP) (net.IP, error) {
 	conn, err := net.Dial("udp", fmt.Sprintf("%s:80", dest))
 	if err != nil {

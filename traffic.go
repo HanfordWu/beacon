@@ -54,33 +54,34 @@ func (b *BoomerangResult) IsFatal() bool {
 }
 
 // DiscoverAndProbe first runs a traceroute from source to destination, then probes packets over the discovered path.
-func (tc *TransportChannel) DiscoverAndProbe(src, dst net.IP, numPackets, timeout int) <-chan BoomerangResult {
+func (tc *TransportChannel) DiscoverAndProbe(src, dst net.IP, numPackets, timeout int) (<-chan BoomerangResult, error) {
 
-    tracerouteTC, err := NewTransportChannel(
-        WithInterface("any"),
-        WithBPFFilter("icmp"),
-        UseListeners(false),
-    )
-    if err != nil {
-        panic(err)
-    }
+	tracerouteTC, err := NewTransportChannel(
+		WithInterface("any"),
+		WithBPFFilter("icmp"),
+		UseListeners(false),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create TransportChannel for traceroute: %s", err)
+	}
 
-    path, err := tracerouteTC.GetPathTo(dst, 3)
-    if err != nil {
-        panic(err)
-    }
+	path, err := tracerouteTC.GetPathTo(dst, 3)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to run traceroute: %s", err)
+	}
 
-    tracerouteTC.Close()
+	tracerouteTC.Close()
 
-    prePath := []net.IP{
-        {13,106,165,163},
-        {13,106,165,162},
-    }
+	srcIP, err := tracerouteTC.FindSourceIPForDest(dst)
+	if err != nil {
+		return nil, err
+	}
+	prePath := []net.IP{srcIP}
 
-    path = append(prePath, path...)
-    fmt.Printf("found path: %v\n", path)
+	path = append(prePath, path...)
+	fmt.Printf("found path: %v\n", path)
 
-    return tc.ProbeEachHopOfPath(path, numPackets, timeout)
+	return tc.ProbeEachHopOfPath(path, numPackets, timeout), nil
 }
 
 // ProbeEachHopOfPath probes each hop in a path, but accepts a transport channel as an argument.  This allows the caller to share
