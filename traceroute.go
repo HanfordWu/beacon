@@ -7,9 +7,8 @@ import (
 
 // Traceroute between specified source and destination devices
 // sourceIP needs to be provided if source device is in a different Autonomous System and source IP cannot be determined automatically
-func Traceroute(destinationIP string, sourceIP string, timeoutMs int32, interfaceDevice string) ([]string, error) {
+func Traceroute(destinationIP string, sourceIP string, timeout int, interfaceDevice string) ([]string, error) {
 
-	var timeout int = int(timeoutMs)
 	var destIP net.IP = net.ParseIP(destinationIP)
 
 	route := make([]string, 0)
@@ -32,23 +31,19 @@ func Traceroute(destinationIP string, sourceIP string, timeoutMs int32, interfac
 	tc, err := NewTransportChannel(
 		WithBPFFilter("icmp"),
 		WithInterface(interfaceDevice),
+		WithTimeout(100),
+		UseListeners(false),
 	)
-
 	if err != nil {
 		return nil, fmt.Errorf("Error creating transport channel: %s", err)
 	}
 
-	pathChannelParam := PathChannelParams{
-		destIP:           destIP,
-		overrideSourceIP: nil,
-		timeoutMs:        timeout,
-	}
-
+	var srcIP net.IP = nil
 	if len(sourceIP) > 0 {
-		pathChannelParam.overrideSourceIP = net.ParseIP(sourceIP)
+		srcIP = net.ParseIP(sourceIP)
 	}
 
-	pc, err := tc.GetPathChannelTo(pathChannelParam)
+	pc, err := tc.GetPathChannelTo(destIP, srcIP, timeout)
 	if err != nil {
 		return nil, err
 	}
@@ -71,10 +66,9 @@ func Traceroute(destinationIP string, sourceIP string, timeoutMs int32, interfac
 
 		} else {
 			fmt.Printf("%s (%s)\n", hostname[0], hop.String())
-			route = append(route, "%s (%s)\n", hostname[0], hop.String())
+			route = append(route, fmt.Sprintf("%s (%s)\n", hostname[0], hop.String()))
 		}
 	}
 
-	fmt.Println(route)
 	return route, nil
 }

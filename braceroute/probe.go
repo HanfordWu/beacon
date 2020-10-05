@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var source string
 var dest string
 var numPackets int
 var hops string
@@ -29,7 +28,6 @@ var ProbeCmd = &cobra.Command{
 }
 
 func initProbe() {
-	ProbeCmd.Flags().StringVarP(&source, "source", "s", "", "source IP/host (defaults to eth0 interface)")
 	ProbeCmd.Flags().StringVarP(&dest, "dest", "d", "", "destination IP/host (required)")
 	ProbeCmd.Flags().IntVarP(&numPackets, "num-packets", "n", 30, "number of probes to send per hop")
 	ProbeCmd.Flags().StringVarP(&hops, "path", "p", "", "manually define a comma separated list of hops to probe")
@@ -56,17 +54,24 @@ func probePreRun(cmd *cobra.Command, args []string) error {
 
 func probeRun(cmd *cobra.Command, args []string) error {
 	var err error
-	var path beacon.Path
+	var inputPath beacon.Path
 
 	if dest != "" {
-		path, err = findPathFromSourceToDest()
+		inputPath, err = findPathFromSourceToDest()
 	} else if hops != "" {
-		path, err = parsePathFromHopsString(hops)
+		inputPath, err = parsePathFromHopsString(hops)
 	} else {
 		return errors.New("At least one of destination (-d) or path (-p) must be supplied")
 	}
 	if err != nil {
 		return err
+	}
+
+	var path beacon.Path
+	for _, hop := range inputPath {
+		if hop != nil {
+			path = append(path, hop)
+		}
 	}
 
 	fmt.Printf("%v\n", path)
@@ -119,18 +124,7 @@ func findPathFromSourceToDest() (beacon.Path, error) {
 
 	pathFinderTC, err := beacon.NewTransportChannel(
 		beacon.WithBPFFilter("icmp"),
-		beacon.WithInterface(interfaceDevice),
 	)
-	if err != nil {
-		return nil, err
-	}
-
-	// if no source was provided via cli flag, default to local
-	if source == "" {
-		srcIP, err = pathFinderTC.FindLocalIP()
-	} else {
-		srcIP, err = beacon.ParseIPFromString(source)
-	}
 	if err != nil {
 		return nil, err
 	}
@@ -140,22 +134,41 @@ func findPathFromSourceToDest() (beacon.Path, error) {
 		return nil, err
 	}
 
-	fmt.Printf("Finding path from %s to %s\n", srcIP, destIP)
+	var path beacon.Path
 
-	path, err := pathFinderTC.GetPathFromSourceToDest(srcIP, destIP, timeout)
-	if err != nil {
-		return nil, err
+	if source == "" {
+		// if no source was provided via cli flag, use best source for dest
+		srcIP, err = pathFinderTC.FindSourceIPForDest(destIP)
+		if err != nil {
+			return nil, err
+		}
+
+		fmt.Printf("Finding path to %s\n", destIP)
+		path, err = pathFinderTC.GetPathTo(destIP, timeout)
+		if err != nil {
+			return nil, err
+		}
+
+		path = append([]net.IP{srcIP}, path...)
+
+	} else {
+		srcIP, err = beacon.ParseIPFromString(source)
+		fmt.Printf("Finding path from %s to %s\n", srcIP, destIP)
+		path, err = pathFinderTC.GetPathFromSourceToDest(srcIP, destIP, timeout)
+		if err != nil {
+			return nil, err
+		}
+
+		vantageIP, err := pathFinderTC.FindLocalIP()
+		if err != nil {
+			return nil, err
+		}
+		if !(path[0].Equal(vantageIP)) {
+			path = append([]net.IP{vantageIP}, path...)
+		}
 	}
+
 	pathFinderTC.Close()
-
-	// prepend the host to the path
-	vantageIP, err := pathFinderTC.FindLocalIP()
-	if err != nil {
-		return nil, err
-	}
-	if !(path[0].Equal(vantageIP)) {
-		path = append([]net.IP{vantageIP}, path...)
-	}
 
 	return path, nil
 }

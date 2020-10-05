@@ -25,6 +25,7 @@ type TransportChannel struct {
 	bufferSize   int
 	filter       string
 	timeout      int
+	useListeners bool
 }
 
 // TransportChannelOption modifies a TransportChannel struct
@@ -67,14 +68,23 @@ func WithBufferSize(bufferSize int) TransportChannelOption {
 	}
 }
 
+// UseListeners sets up the TransportChannel for listener use or not
+func UseListeners(useListeners bool) TransportChannelOption {
+	return func(tc *TransportChannel) {
+		tc.useListeners = useListeners
+	}
+}
+
 // NewTransportChannel instantiates a new transport chanel
 func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, error) {
 	tc := &TransportChannel{
-		snaplen:     4800,
-		bufferSize:  16 * 1024 * 1024,
-		filter:      "",
-		timeout:     100,
-		listenerMap: NewListenerMap(),
+		snaplen:      4800,
+		bufferSize:   16 * 1024 * 1024,
+		deviceName:   "any",
+		filter:       "",
+		timeout:      100,
+		listenerMap:  NewListenerMap(),
+		useListeners: true,
 	}
 
 	for _, opt := range options {
@@ -93,7 +103,7 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 		return nil, err
 	} else if err := inactive.SetBufferSize(tc.bufferSize); err != nil {
 		return nil, err
-	} else if err := inactive.SetTimeout(time.Millisecond * -time.Duration(tc.timeout)); err != nil { // set negative timeout, mechanics described here: https://godoc.org/github.com/google/gopacket/pcap#hdr-PCAP_Timeouts
+	} else if err := inactive.SetTimeout(time.Millisecond * time.Duration(tc.timeout)); err != nil { // set negative timeout, mechanics described here: https://godoc.org/github.com/google/gopacket/pcap#hdr-PCAP_Timeouts
 		return nil, err
 	}
 
@@ -119,12 +129,14 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 	}
 	tc.socketFD = fd
 
-	// activate listeners
-	go func() {
-		for packet := range tc.rx() {
-			go tc.listenerMap.Run(packet)
-		}
-	}()
+	if tc.useListeners {
+		// activate listeners
+		go func() {
+			for packet := range tc.rx() {
+				go tc.listenerMap.Run(packet)
+			}
+		}()
+	}
 
 	return tc, nil
 }
@@ -238,4 +250,31 @@ func (tc *TransportChannel) FindLocalIP() (net.IP, error) {
 	}
 
 	return eth0Device.Addresses[0].IP, nil
+}
+
+// Interface returns the interface the TransportChannel is listening on
+func (tc *TransportChannel) Interface() string {
+	return tc.deviceName
+}
+
+// Filter returns the BPF the TransportChannel uses
+func (tc *TransportChannel) Filter() string {
+	return tc.filter
+}
+
+func (tc *TransportChannel) Version() string {
+	return pcap.Version()
+}
+
+// FindSourceIPForDest finds the IP of the interface device of the TransportChannel instance
+func (tc *TransportChannel) FindSourceIPForDest(dest net.IP) (net.IP, error) {
+	conn, err := net.Dial("udp", fmt.Sprintf("%s:80", dest))
+	if err != nil {
+		return nil, fmt.Errorf("Failed to dial dest ip %s: %s", dest, err)
+	}
+	defer conn.Close()
+
+	sourceIP := conn.LocalAddr().(*net.UDPAddr).IP
+
+	return sourceIP, nil
 }
