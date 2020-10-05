@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/google/gopacket"
@@ -12,6 +13,21 @@ import (
 
 // Path is a slice of IPs which represents a path through the network
 type Path []net.IP
+
+// String returns the string representation of a path
+func (p Path) String() string {
+	stringIpArr := make([]string, len(p))
+	for idx, ip := range p {
+		stringIpArr[idx] = ip.String()
+	}
+
+	stringBuilder := strings.Builder{}
+	stringBuilder.WriteString("[")
+	stringBuilder.WriteString(strings.Join(stringIpArr, ", "))
+	stringBuilder.WriteString("]")
+
+	return stringBuilder.String()
+}
 
 // SubPath returns all the elements in the path up to and including
 func (p Path) SubPath(lastHop net.IP) Path {

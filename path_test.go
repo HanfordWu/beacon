@@ -58,6 +58,30 @@ func TestPathEqualDiffLen(t *testing.T) {
 	}
 }
 
+func TestPathString(t *testing.T) {
+	p := Path{
+		net.IP{127, 0, 0, 1},
+		net.IP{8, 8, 8, 8},
+		net.IP{10, 20, 30, 96},
+	}
+
+	expectedPathString := "[127.0.0.1, 8.8.8.8, 10.20.30.96]"
+
+	if p.String() != expectedPathString {
+		t.Errorf("path string repr was incorrect, want: %s got: %s", expectedPathString, p.String())
+	}
+}
+
+func TestEmptyPathString(t *testing.T) {
+	p := Path{}
+
+	expectedPathString := "[]"
+
+	if p.String() != expectedPathString {
+		t.Errorf("empty path string repr was incorrect, want: %s got: %s", expectedPathString, p.String())
+	}
+}
+
 func TestSubPath(t *testing.T) {
 	p := Path{
 		net.IP{127, 0, 0, 1},
