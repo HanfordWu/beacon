@@ -1,7 +1,7 @@
 package beacon
 
 import (
-    "encoding/hex"
+	"encoding/hex"
 	"net"
 	"testing"
 )
@@ -42,36 +42,36 @@ func TestParseIPFromName(t *testing.T) {
 }
 
 func TestTracerouteResponseMatchesPortPair(t *testing.T) {
-    hexString := "4500002600004000011113ec0d6aeeb1682c019482e182ba0012752f7472616365726f757465"
-    payload, err := hex.DecodeString(hexString)
-    if err != nil {
-        t.Errorf("Failed to parse valid byte array from hex string: %s", hexString)
-    }
+	hexString := "4500002600004000011113ec0d6aeeb1682c019482e182ba0012752f7472616365726f757465"
+	payload, err := hex.DecodeString(hexString)
+	if err != nil {
+		t.Errorf("Failed to parse valid byte array from hex string: %s", hexString)
+	}
 
-    ports := portPair{
-        src: 33505,
-        dst: 33466,
-    }
+	ports := portPair{
+		src: 33505,
+		dst: 33466,
+	}
 
-    if !tracerouteResponseMatchesPortPair(payload, ports) {
-        t.Errorf("tracerouteResponse ports matched the test input, but the function failed to correctly assess it")
-    }
+	if !tracerouteResponseMatchesPortPair(payload, ports) {
+		t.Errorf("tracerouteResponse ports matched the test input, but the function failed to correctly assess it")
+	}
 }
 
 func TestInvalidTracerouteResponseMatchesPortPair(t *testing.T) {
-    hexString := "4500002600004000011113ec0d6aeeb1682c019482e182ba0012752f7472616365726f757465"
-    payload, err := hex.DecodeString(hexString)
-    if err != nil {
-        t.Errorf("Failed to parse valid byte array from hex string: %s", hexString)
-    }
+	hexString := "4500002600004000011113ec0d6aeeb1682c019482e182ba0012752f7472616365726f757465"
+	payload, err := hex.DecodeString(hexString)
+	if err != nil {
+		t.Errorf("Failed to parse valid byte array from hex string: %s", hexString)
+	}
 
-    // ports do not match packet described by hex string
-    ports := portPair{
-        src: 00001,
-        dst: 00001,
-    }
+	// ports do not match packet described by hex string
+	ports := portPair{
+		src: 00001,
+		dst: 00001,
+	}
 
-    if tracerouteResponseMatchesPortPair(payload, ports) {
-        t.Errorf("tracerouteResponse ports didn't match the test input, but the function thought they did")
-    }
+	if tracerouteResponseMatchesPortPair(payload, ports) {
+		t.Errorf("tracerouteResponse ports didn't match the test input, but the function thought they did")
+	}
 }
