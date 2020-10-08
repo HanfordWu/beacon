@@ -74,17 +74,16 @@ func buildICMPTraceroutePacket(sourceIP, destIP net.IP, ttl uint8, payload []byt
 	return nil
 }
 
-func buildUDPTraceroutePacket(sourceIP, destIP net.IP, ttl uint8, payload []byte, buf gopacket.SerializeBuffer) error {
+func buildUDPTraceroutePacket(sourceIP, destIP net.IP, sourcePort, destPort layers.UDPPort, ttl uint8, payload []byte, buf gopacket.SerializeBuffer) (*layers.UDP, error) {
 	opts := gopacket.SerializeOptions{
 		ComputeChecksums: true,
 		FixLengths:       true,
 	}
 
 	ipLayer := buildIPv4UDPLayer(sourceIP, destIP, ttl)
-
 	udpLayer := &layers.UDP{
-		SrcPort: 53576,
-		DstPort: 33437,
+		SrcPort: sourcePort,
+		DstPort: destPort,
 	}
 	udpLayer.SetNetworkLayerForChecksum(ipLayer)
 
@@ -94,9 +93,9 @@ func buildUDPTraceroutePacket(sourceIP, destIP net.IP, ttl uint8, payload []byte
 		gopacket.Payload(payload),
 	)
 	if err != nil {
-		return err
+		return udpLayer, err
 	}
-	return nil
+	return udpLayer, nil
 }
 
 func buildEncapTraceroutePacket(outerSourceIP, outerDestIP, innerSourceIP, innerDestIP net.IP, ttl uint8, payload []byte, buf gopacket.SerializeBuffer) error {
