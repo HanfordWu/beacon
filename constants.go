@@ -9,4 +9,6 @@ const (
 	icmpEchoRequest     = 2048
 	icmpEchoReply       = 0
 	icmpPortUnreachable = 771
+
+	maxPortOffset = 89
 )

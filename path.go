@@ -62,6 +62,19 @@ type PathTerminator struct {
 	secondToLastIP net.IP
 }
 
+func (tc *TransportChannel) newTraceroutePortPair() portPair {
+	tc.portLock.Lock()
+	defer tc.portLock.Unlock()
+
+	tc.srcPortOffset = (tc.srcPortOffset + 1) % maxPortOffset
+	tc.dstPortOffset = (tc.dstPortOffset + 1) % maxPortOffset
+
+	return portPair{
+		src: layers.UDPPort(33434 + tc.srcPortOffset),
+		dst: layers.UDPPort(33434 + tc.dstPortOffset),
+	}
+}
+
 // GetPathTo returns a Path to a destination IP from the caller
 func (tc *TransportChannel) GetPathTo(destIP net.IP, timeout int) (Path, error) {
 	path := make([]net.IP, 0)
@@ -135,7 +148,7 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 		finalSourceIP = sourceIP
 	}
 
-	ports := newTraceroutePortPair()
+	ports := tc.newTraceroutePortPair()
 
 	go func() {
 		for packet := range tc.rx() {

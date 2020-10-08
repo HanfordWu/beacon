@@ -1,10 +1,8 @@
 package beacon
 
 import (
-	"math/rand"
 	"net"
 	"sync"
-	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -80,15 +78,6 @@ func merge(resultChannels ...chan BoomerangResult) <-chan BoomerangResult {
 	}()
 
 	return resultChannel
-}
-
-func newTraceroutePortPair() portPair {
-	rand.Seed(time.Now().UnixNano())
-
-	return portPair{
-		src: layers.UDPPort(33434 + rand.Intn(89)),
-		dst: layers.UDPPort(33434 + rand.Intn(89)),
-	}
 }
 
 func tracerouteResponseMatchesPortPair(payload []byte, ports portPair) bool {
