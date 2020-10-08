@@ -144,19 +144,20 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 			icmp, _ := icmpLayer.(*layers.ICMPv4)
 			ip4, _ := ipv4Layer.(*layers.IPv4)
 
+			if !tracerouteResponseMatchesPortPair(icmp.Payload, ports) {
+				// packet is from a different traceroute id
+				continue
+			}
+
 			// fmt.Printf("%s -> %s : %s\n", ip4.SrcIP, ip4.DstIP, icmp.TypeCode)
 			if int(icmp.TypeCode) == icmpTTLExceeded && ip4.DstIP.Equal(finalSourceIP) {
-				if tracerouteResponseMatchesPortPair(icmp.Payload, ports) {
-					found <- ip4.SrcIP
-				}
+				found <- ip4.SrcIP
 			} else if int(icmp.TypeCode) == icmpPortUnreachable && ip4.DstIP.Equal(finalSourceIP) {
-				if tracerouteResponseMatchesPortPair(icmp.Payload, ports) {
-					done <- PathTerminator{
-						secondToLastIP: ip4.SrcIP,
-						lastIP:         destIP,
-					}
-					return
+				done <- PathTerminator{
+					secondToLastIP: ip4.SrcIP,
+					lastIP:         destIP,
 				}
+				return
 			}
 		}
 	}()
