@@ -62,6 +62,19 @@ type PathTerminator struct {
 	secondToLastIP net.IP
 }
 
+func (tc *TransportChannel) newTraceroutePortPair() portPair {
+	tc.portLock.Lock()
+	defer tc.portLock.Unlock()
+
+	tc.srcPortOffset = (tc.srcPortOffset + 1) % maxPortOffset
+	tc.dstPortOffset = (tc.dstPortOffset + 1) % maxPortOffset
+
+	return portPair{
+		src: layers.UDPPort(33434 + tc.srcPortOffset),
+		dst: layers.UDPPort(33434 + tc.dstPortOffset),
+	}
+}
+
 // GetPathTo returns a Path to a destination IP from the caller
 func (tc *TransportChannel) GetPathTo(destIP net.IP, timeout int) (Path, error) {
 	path := make([]net.IP, 0)
@@ -135,12 +148,19 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 		finalSourceIP = sourceIP
 	}
 
+	ports := tc.newTraceroutePortPair()
+
 	go func() {
 		for packet := range tc.rx() {
 			icmpLayer := packet.Layer(layers.LayerTypeICMPv4)
 			ipv4Layer := packet.Layer(layers.LayerTypeIPv4)
 			icmp, _ := icmpLayer.(*layers.ICMPv4)
 			ip4, _ := ipv4Layer.(*layers.IPv4)
+
+			if !tracerouteResponseMatchesPortPair(icmp.Payload, ports) {
+				// packet is from a different traceroute id
+				continue
+			}
 
 			// fmt.Printf("%s -> %s : %s\n", ip4.SrcIP, ip4.DstIP, icmp.TypeCode)
 			if int(icmp.TypeCode) == icmpTTLExceeded && ip4.DstIP.Equal(finalSourceIP) {
@@ -162,7 +182,7 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 
 		var ttl uint8
 		for ttl = 1; ttl <= 32; ttl++ {
-			err := buildUDPTraceroutePacket(finalSourceIP, destIP, ttl, []byte("Hello"), buf)
+			err := buildUDPTraceroutePacket(finalSourceIP, destIP, ports.src, ports.dst, ttl, []byte("traceroute"), buf)
 			if err != nil {
 				fmt.Printf("Failed to build udp tracert packet: %s\n", err)
 			}
