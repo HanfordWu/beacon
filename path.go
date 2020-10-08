@@ -168,8 +168,7 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 
 		var ttl uint8
 		for ttl = 1; ttl <= 32; ttl++ {
-			// _, err := buildUDPTraceroutePacket(finalSourceIP, destIP, ttl, []byte("Hello"), buf)
-			_, err := buildUDPTraceroutePacket(finalSourceIP, destIP, ports.src, ports.dst, ttl, []byte("traceroute"), buf)
+			err := buildUDPTraceroutePacket(finalSourceIP, destIP, ports.src, ports.dst, ttl, []byte("traceroute"), buf)
 			if err != nil {
 				fmt.Printf("Failed to build udp tracert packet: %s\n", err)
 			}
