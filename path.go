@@ -150,17 +150,26 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 
 	ports := tc.newTraceroutePortPair()
 
+	criteria := func(packet gopacket.Packet, payload *BoomerangPayload) bool {
+		icmpLayer := packet.Layer(layers.LayerTypeICMPv4)
+		icmp, _ := icmpLayer.(*layers.ICMPv4)
+
+		if !tracerouteResponseMatchesPortPair(icmp.Payload, ports) {
+			// packet is from a different traceroute id
+			return false
+		}
+		return true
+	}
+
+	listener := NewPersistentListener(criteria)
+	packetChan := tc.RegisterListener(listener)
+
 	go func() {
-		for packet := range tc.rx() {
+		for packet := range packetChan {
 			icmpLayer := packet.Layer(layers.LayerTypeICMPv4)
 			ipv4Layer := packet.Layer(layers.LayerTypeIPv4)
 			icmp, _ := icmpLayer.(*layers.ICMPv4)
 			ip4, _ := ipv4Layer.(*layers.IPv4)
-
-			if !tracerouteResponseMatchesPortPair(icmp.Payload, ports) {
-				// packet is from a different traceroute id
-				continue
-			}
 
 			// fmt.Printf("%s -> %s : %s\n", ip4.SrcIP, ip4.DstIP, icmp.TypeCode)
 			if int(icmp.TypeCode) == icmpTTLExceeded && ip4.DstIP.Equal(finalSourceIP) {
@@ -178,6 +187,7 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 	go func() {
 		// wait for listener to be ready to recv
 		defer close(pathChan)
+		defer tc.UnregisterListener(listener)
 		buf := gopacket.NewSerializeBuffer()
 
 		var ttl uint8
