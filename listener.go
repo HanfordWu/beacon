@@ -13,18 +13,33 @@ type PacketFilter func(packet gopacket.Packet, payload *BoomerangPayload) bool
 
 // Listener is represented by a uuid and a criteria
 type Listener struct {
-	id        uuid.UUID
-	Criteria  PacketFilter
-	matchChan chan gopacket.Packet
+	id         uuid.UUID
+	Criteria   PacketFilter
+	matchChan  chan gopacket.Packet
+	persistent bool
 }
 
 // NewListener return a new listener with the given criteria,
 // a newly generated uuid and an initialized match channel.
 func NewListener(criteria PacketFilter) *Listener {
 	return &Listener{
-		id:        uuid.New(),
-		Criteria:  criteria,
-		matchChan: make(chan gopacket.Packet, 1),
+		id:         uuid.New(),
+		Criteria:   criteria,
+		matchChan:  make(chan gopacket.Packet, 1),
+		persistent: false,
+	}
+}
+
+// NewPersistentListener return a new listener with the given criteria,
+// a newly generated uuid and an initialized match channel.
+// PersistentListener differs from Listener in that it will not be removed
+// when a match is found.
+func NewPersistentListener(criteria PacketFilter) *Listener {
+	return &Listener{
+		id:         uuid.New(),
+		Criteria:   criteria,
+		matchChan:  make(chan gopacket.Packet, 1),
+		persistent: true,
 	}
 }
 
@@ -88,7 +103,9 @@ func (lm *ListenerMap) Run(p gopacket.Packet) {
 
 		if listener.Criteria(p, unmarshalledPayload) {
 			listener.matchChan <- p
-			listenersToDelete = append(listenersToDelete, listener)
+			if !listener.persistent {
+				listenersToDelete = append(listenersToDelete, listener)
+			}
 		}
 	}
 
@@ -103,14 +120,14 @@ func (lm *ListenerMap) Run(p gopacket.Packet) {
 
 // RegisterListener attaches a packet listener to the current transport channel.
 // When the packet listener finds a packet matching its criteria, the packet will
-// be sent to the caller over the returned channel
+// be sent to the caller over the returned channel.
 func (tc *TransportChannel) RegisterListener(l *Listener) chan gopacket.Packet {
 	tc.listenerMap.Store(l.id, l)
 
 	return l.matchChan
 }
 
-// UnregisterListener removes an attached listener
+// UnregisterListener removes an attached listener.
 func (tc *TransportChannel) UnregisterListener(l *Listener) uuid.UUID {
 	tc.listenerMap.Delete(l.id)
 

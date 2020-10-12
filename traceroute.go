@@ -32,7 +32,6 @@ func Traceroute(destinationIP string, sourceIP string, timeout int, interfaceDev
 		WithBPFFilter("icmp"),
 		WithInterface(interfaceDevice),
 		WithTimeout(100),
-		UseListeners(false),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("Error creating transport channel: %s", err)
