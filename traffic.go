@@ -218,7 +218,6 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 		timeOutDuration := time.Duration(timeout) * time.Second
 		timer := time.NewTimer(timeOutDuration)
 
-		txTime := time.Now().UTC()
 		err := tc.SendToPath(buf.Bytes(), path)
 		if err != nil {
 			fmt.Printf("error in SendToPath: %s\n", err)
@@ -231,6 +230,7 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 			}
 			return
 		}
+		txTime := time.Now().UTC()
 
 		select {
 		case result := <-seen:
