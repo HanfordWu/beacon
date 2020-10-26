@@ -165,9 +165,9 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 	packetChan := tc.RegisterListener(listener)
 
 	go func() {
-		for packet := range packetChan {
-			icmpLayer := packet.Layer(layers.LayerTypeICMPv4)
-			ipv4Layer := packet.Layer(layers.LayerTypeIPv4)
+		for matchedPacket := range packetChan {
+			icmpLayer := matchedPacket.packet.Layer(layers.LayerTypeICMPv4)
+			ipv4Layer := matchedPacket.packet.Layer(layers.LayerTypeIPv4)
 			icmp, _ := icmpLayer.(*layers.ICMPv4)
 			ip4, _ := ipv4Layer.(*layers.IPv4)
 
