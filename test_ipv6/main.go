@@ -11,6 +11,7 @@ import (
     "golang.org/x/net/ipv6"
     "os"
     "syscall"
+    "strings"
 )
 
 var (
@@ -81,6 +82,71 @@ func send_packet_net(packetData []byte, protocol, src_ip, dst_ip string){
 
     fmt.Println("finished writing packet net.ipv6")
     return
+}
+
+func craft_ipip_v6_packet(src_mac, nxt_mac string, path []string, include_eth bool) []byte {
+    opts := gopacket.SerializeOptions{
+        ComputeChecksums: true,
+        FixLengths:true,
+    }
+    buf := gopacket.NewSerializeBuffer()
+    num_layers := len(path) + 2
+    packet_layers := make([]gopacket.SerializableLayer, num_layers)
+
+    for idx := range path[:len(path) - 1] {
+        addressStart := net.ParseIP(path[idx])
+        addressEnd := net.ParseIP(path[idx+1])
+
+        fmt.Println("start: ", addressStart)
+        fmt.Println("end: ", addressEnd)
+
+        v6_encapped := layers.IPv6{
+            Version: uint8(6),
+            HopLimit: uint8(64),
+            SrcIP: addressStart,
+            DstIP: addressEnd,
+            NextHeader: layers.IPProtocolIPv6,
+            FlowLabel: uint32(0),
+            TrafficClass: uint8(0),
+        }
+        packet_layers[idx] = &v6_encapped
+    }
+
+    last_v6 := layers.IPv6{
+        Version: uint8(6),
+        HopLimit: uint8(64),
+        SrcIP: net.ParseIP(path[len(path) - 2]),
+        DstIP: net.ParseIP(path[len(path) - 1]),
+        NextHeader: layers.IPProtocolUDP,
+        FlowLabel: uint32(0),
+        TrafficClass: uint8(0),
+    }
+
+    packet_layers[len(path) - 1] = &last_v6
+
+    srcPort := 26305
+    dstPort := 25305
+    udpLayer := layers.UDP{
+        SrcPort : layers.UDPPort(srcPort),
+        DstPort: layers.UDPPort(dstPort),
+    }
+    udpLayer.SetNetworkLayerForChecksum(&last_v6)
+
+    packet_layers[len(path)] = &udpLayer
+
+    payload := gopacket.Payload([]byte("This is my packet, not your packet, stop reading me!"))
+    packet_layers[len(path) + 1] = payload
+
+    fmt.Println(packet_layers)
+
+    err := gopacket.SerializeLayers(buf, opts, packet_layers...)
+    if err != nil {
+        fmt.Println("failure in serialize ipip layers")
+        log.Fatal(err)
+    }
+    packetData := buf.Bytes()
+
+    return packetData
 }
 
 func craft_icmp_packet(src_ip, dst_ip, src_mac, nxt_mac string, include_eth bool, seqNumber uint16) []byte {
@@ -261,6 +327,12 @@ func main() { // src_device, dst_device, src_ip, dst_ip, src_mac, nxt_mac
     if !present {
         nxt_mac = "00:00:00:00:00:00"
     }
+    path, present := os.LookupEnv("path")
+    if !present {
+        path = src_ip + "," +  dst_ip + "," +  src_ip
+    }
+    boomerangPath := strings.Split(path, ",")
+    fmt.Println(boomerangPath)
 
     fmt.Println(src_device)
     fmt.Println(dst_device)
@@ -280,17 +352,22 @@ func main() { // src_device, dst_device, src_ip, dst_ip, src_mac, nxt_mac
     //send_packet_pcap(packetDataWithEth, src_device, snapshot_len, promiscuous, timeout)
     //fmt.Println("packetWithEth: ", packet_to_print)
 
-    packetDataWithoutEth := craft_udp_packet(src_ip, dst_ip, src_mac, nxt_mac, false)
-    packet_to_print := gopacket.NewPacket(packetDataWithoutEth,layers.LayerTypeIPv6,gopacket.Default,)
-    fmt.Println("packetWithoutEth: ", packet_to_print)
+    //packetDataWithoutEth := craft_udp_packet(src_ip, dst_ip, src_mac, nxt_mac, false)
+    //packet_to_print := gopacket.NewPacket(packetDataWithoutEth,layers.LayerTypeIPv6,gopacket.Default,)
+    //fmt.Println("packetWithoutEth: ", packet_to_print)
     //send_packet_net(packetDataWithoutEth, "ip6:17", "::1", dst_ip)
 
-    send_packet_syscall(packetDataWithoutEth, dst_ip)
+    //send_packet_syscall(packetDataWithoutEth, dst_ip)
 
-    icmpDataWithoutEth := craft_icmp_packet(src_ip, dst_ip, src_mac, nxt_mac, false, 1)
-    packet_to_print = gopacket.NewPacket(icmpDataWithoutEth,layers.LayerTypeIPv6,gopacket.Default,)
-    fmt.Println("icmpWithoutEth: ", packet_to_print)
-    send_packet_syscall(icmpDataWithoutEth, dst_ip)
+    //icmpDataWithoutEth := craft_icmp_packet(src_ip, dst_ip, src_mac, nxt_mac, false, 1)
+    //packet_to_print = gopacket.NewPacket(icmpDataWithoutEth,layers.LayerTypeIPv6,gopacket.Default,)
+    //fmt.Println("icmpWithoutEth: ", packet_to_print)
+    //send_packet_syscall(icmpDataWithoutEth, dst_ip)
+
+    boomerangPacketData := craft_ipip_v6_packet(src_mac, nxt_mac, boomerangPath, false)
+    packet_to_print := gopacket.NewPacket(boomerangPacketData,layers.LayerTypeIPv6,gopacket.Default,)
+    fmt.Println("bomerangPacket: ", packet_to_print)
+    send_packet_syscall(boomerangPacketData, boomerangPath[1])
 
     <-read
 }
