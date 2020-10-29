@@ -12,6 +12,7 @@ import (
     "os"
     "syscall"
     "strings"
+    "math/rand"
 )
 
 var (
@@ -84,16 +85,16 @@ func send_packet_net(packetData []byte, protocol, src_ip, dst_ip string){
     return
 }
 
-func craft_ipip_v6_packet(src_mac, nxt_mac string, path []string, include_eth bool) []byte {
+func craft_ipip_v6_packet(path []string) []byte {
     opts := gopacket.SerializeOptions{
         ComputeChecksums: true,
         FixLengths:true,
     }
     buf := gopacket.NewSerializeBuffer()
-    num_layers := len(path) + 2
+    num_layers := len(path) + 1
     packet_layers := make([]gopacket.SerializableLayer, num_layers)
 
-    for idx := range path[:len(path) - 1] {
+    for idx := range path[:len(path) - 2] {
         addressStart := net.ParseIP(path[idx])
         addressEnd := net.ParseIP(path[idx+1])
 
@@ -107,7 +108,7 @@ func craft_ipip_v6_packet(src_mac, nxt_mac string, path []string, include_eth bo
             DstIP: addressEnd,
             NextHeader: layers.IPProtocolIPv6,
             FlowLabel: uint32(0),
-            TrafficClass: uint8(0),
+            TrafficClass: uint8(0xc0),
         }
         packet_layers[idx] = &v6_encapped
     }
@@ -119,10 +120,10 @@ func craft_ipip_v6_packet(src_mac, nxt_mac string, path []string, include_eth bo
         DstIP: net.ParseIP(path[len(path) - 1]),
         NextHeader: layers.IPProtocolUDP,
         FlowLabel: uint32(0),
-        TrafficClass: uint8(0),
+        TrafficClass: uint8(0xc0),
     }
 
-    packet_layers[len(path) - 1] = &last_v6
+    packet_layers[len(path) - 2] = &last_v6
 
     srcPort := 26305
     dstPort := 25305
@@ -132,10 +133,12 @@ func craft_ipip_v6_packet(src_mac, nxt_mac string, path []string, include_eth bo
     }
     udpLayer.SetNetworkLayerForChecksum(&last_v6)
 
-    packet_layers[len(path)] = &udpLayer
+    packet_layers[len(path) - 1] = &udpLayer
 
-    payload := gopacket.Payload([]byte("This is my packet, not your packet, stop reading me!"))
-    packet_layers[len(path) + 1] = payload
+    payload_array := make([]byte, 500)
+    rand.Read(payload_array)
+    payload := gopacket.Payload(payload_array)
+    packet_layers[len(path)] = payload
 
     fmt.Println(packet_layers)
 
@@ -149,19 +152,12 @@ func craft_ipip_v6_packet(src_mac, nxt_mac string, path []string, include_eth bo
     return packetData
 }
 
-func craft_icmp_packet(src_ip, dst_ip, src_mac, nxt_mac string, include_eth bool, seqNumber uint16) []byte {
+func craft_icmp_packet(src_ip, dst_ip string, seqNumber uint16) []byte {
     srcIPAddr := net.ParseIP(src_ip)//"fe80::20d:3aff:fef7:d895")
     dstIPAddr := net.ParseIP(dst_ip)
     fmt.Println("dstIPAddr: ", dstIPAddr)
-    SrcMacAddr, err := net.ParseMAC(src_mac)
-    DstMacAddr, err := net.ParseMAC(nxt_mac)
 
     payload := gopacket.Payload([]byte(""))
-    ethLayer := layers.Ethernet{
-        SrcMAC: SrcMacAddr,
-        DstMAC: DstMacAddr,
-        EthernetType: layers.EthernetTypeIPv6,
-    }
     ipV6Layer := layers.IPv6{
         SrcIP: srcIPAddr,
         DstIP: dstIPAddr,
@@ -187,14 +183,11 @@ func craft_icmp_packet(src_ip, dst_ip, src_mac, nxt_mac string, include_eth bool
         FixLengths: true,
         ComputeChecksums: true,
     }
+
     var packetData []byte //= make([]byte, snapshot_len)
-    if include_eth == true {
-        err = gopacket.SerializeLayers(buf, opts, &ethLayer, &ipV6Layer, &icmpLayer, &icmpEchoLayer, payload)
-        packetData = buf.Bytes()
-    } else {
-        err = gopacket.SerializeLayers(buf, opts, &ipV6Layer, &icmpLayer, &icmpEchoLayer, payload)
-        packetData = buf.Bytes()
-    }
+    err = gopacket.SerializeLayers(buf, opts, &ipV6Layer, &icmpLayer, &icmpEchoLayer, payload)
+    packetData = buf.Bytes()
+
     if err != nil {
         fmt.Println("error in SerializeLayers")
         log.Fatal(err)
@@ -203,21 +196,14 @@ func craft_icmp_packet(src_ip, dst_ip, src_mac, nxt_mac string, include_eth bool
     return packetData
 }
 
-func craft_udp_packet(src_ip, dst_ip, src_mac, nxt_mac string, include_eth bool) []byte {
+func craft_udp_packet(src_ip, dst_ip string) []byte {
     srcIPAddr := net.ParseIP(src_ip)//"fe80::20d:3aff:fef7:d895")
     dstIPAddr := net.ParseIP(dst_ip)
     fmt.Println("dstIPAddr: ", dstIPAddr)
     srcPort := 26305
     dstPort := 25305
-    SrcMacAddr, err := net.ParseMAC(src_mac)
-    DstMacAddr, err := net.ParseMAC(nxt_mac)
 
     payload := gopacket.Payload([]byte("This is my packet, not your packet, stop reading me!"))
-    ethLayer := layers.Ethernet{
-        SrcMAC: SrcMacAddr,
-        DstMAC: DstMacAddr,
-        EthernetType: layers.EthernetTypeIPv6,
-    }
     ipV6Layer := layers.IPv6{
         SrcIP: srcIPAddr,
         DstIP: dstIPAddr,
@@ -240,13 +226,9 @@ func craft_udp_packet(src_ip, dst_ip, src_mac, nxt_mac string, include_eth bool)
         ComputeChecksums: true,
     }
     var packetData []byte //= make([]byte, snapshot_len)
-    if include_eth == true {
-        err = gopacket.SerializeLayers(buf, opts, &ethLayer, &ipV6Layer, &udpLayer, payload)
-        packetData = buf.Bytes()
-    } else {
-        err = gopacket.SerializeLayers(buf, opts, &ipV6Layer, &udpLayer, payload)
-        packetData = buf.Bytes()
-    }
+    err = gopacket.SerializeLayers(buf, opts, &ipV6Layer, &udpLayer, payload)
+    packetData = buf.Bytes()
+
     if err != nil {
         fmt.Println("error in SerializeLayers")
         log.Fatal(err)
@@ -303,34 +285,12 @@ func listen_packet(dst_device string, snapshot_len int32, promiscuous bool, time
 
 func main() { // src_device, dst_device, src_ip, dst_ip, src_mac, nxt_mac 
     // Open device
-    src_device, present := os.LookupEnv("src_device")
-    if !present {
-        src_device = "lo"
-    }
-    dst_device, present := os.LookupEnv("dst_device")
-    if !present {
-        dst_device = "lo"
-    }
-    src_ip, present := os.LookupEnv("src_ip")
-    if !present {
-        src_ip = "::1"
-    }
-    dst_ip, present := os.LookupEnv("dst_ip")
-    if !present {
-        dst_ip = "::1"
-    }
-    src_mac, present := os.LookupEnv("src_mac")
-    if !present {
-        src_mac = "00:00:00:00:00:00"
-    }
-    nxt_mac, present := os.LookupEnv("nxt_mac")
-    if !present {
-        nxt_mac = "00:00:00:00:00:00"
-    }
-    path, present := os.LookupEnv("path")
-    if !present {
-        path = src_ip + "," +  dst_ip + "," +  src_ip
-    }
+    src_device := os.Args[1]
+    dst_device := os.Args[2]
+    src_ip := os.Args[3]
+    dst_ip := os.Args[4]
+    path := os.Args[5]
+
     boomerangPath := strings.Split(path, ",")
     fmt.Println(boomerangPath)
 
@@ -338,8 +298,6 @@ func main() { // src_device, dst_device, src_ip, dst_ip, src_mac, nxt_mac
     fmt.Println(dst_device)
     fmt.Println(src_ip)
     fmt.Println(dst_ip)
-    fmt.Println(src_mac)
-    fmt.Println(nxt_mac)
 
     //var filter string = "udp and port 25305"
     filter := "ip6"
@@ -359,14 +317,14 @@ func main() { // src_device, dst_device, src_ip, dst_ip, src_mac, nxt_mac
 
     //send_packet_syscall(packetDataWithoutEth, dst_ip)
 
-    //icmpDataWithoutEth := craft_icmp_packet(src_ip, dst_ip, src_mac, nxt_mac, false, 1)
-    //packet_to_print = gopacket.NewPacket(icmpDataWithoutEth,layers.LayerTypeIPv6,gopacket.Default,)
+    //icmpDataWithoutEth := craft_icmp_packet(src_ip, dst_ip, 1)
+    //packet_to_print := gopacket.NewPacket(icmpDataWithoutEth,layers.LayerTypeIPv6,gopacket.Default,)
     //fmt.Println("icmpWithoutEth: ", packet_to_print)
     //send_packet_syscall(icmpDataWithoutEth, dst_ip)
 
-    boomerangPacketData := craft_ipip_v6_packet(src_mac, nxt_mac, boomerangPath, false)
+    boomerangPacketData := craft_ipip_v6_packet(boomerangPath)
     packet_to_print := gopacket.NewPacket(boomerangPacketData,layers.LayerTypeIPv6,gopacket.Default,)
-    fmt.Println("bomerangPacket: ", packet_to_print)
+    fmt.Println("boomerangPacket: ", packet_to_print)
     send_packet_syscall(boomerangPacketData, boomerangPath[1])
 
     <-read

@@ -1,3 +1,6 @@
+build-static:
+	go build -ldflags="-extldflags=-static"
+
 build-ipv6:
 	docker build --no-cache -t test-ipv6:latest .
 
@@ -22,3 +25,6 @@ run-ipv6:
 		-e "dst_mac=00:00:00:00:00:00" \
 		-v /var/run/command-api.sock:/var/run/command-api.sock \
 		test-ipv6:latest
+
+run-static:
+	sudo ./test_ipv6 lo lo ::1 ::1 ::1,::1,::1
