@@ -22,12 +22,12 @@ func buildIPIPLayer(sourceIP, destIP net.IP) *layers.IPv4 {
 	return ipipLayer
 }
 
-func buildIPv6IPv6Layer(sourceIP, dstIP net.IP) *layers.IPPv6 {
-	ipipv6Layer := &layers.IPv6{
+func buildIPv6IPv6Layer(sourceIP, dstIP net.IP) *layers.IPv6 {
+     ipipv6Layer := &layers.IPv6{
             Version: uint8(6),
             HopLimit: uint8(64),
-            SrcIP: addressStart,
-            DstIP: addressEnd,
+            SrcIP: sourceIP,
+            DstIP: dstIP,
             NextHeader: layers.IPProtocolIPv6,
             FlowLabel: uint32(0),
             TrafficClass: uint8(0xc0),
@@ -52,8 +52,8 @@ func buildIPv4ICMPLayer(sourceIP, destIP net.IP, ttl uint8) *layers.IPv4 {
 
 func buildIPv6ICMPLayer(sourceIP, destIP net.IP, hopLimit uint8) *layers.IPv6 {
 	ipV6Layer := &layers.IPv6{
-        SrcIP: srcIPAddr,
-        DstIP: dstIPAddr,
+        SrcIP: sourceIP,
+        DstIP: destIP,
         NextHeader: layers.IPProtocolICMPv6,
         HopLimit: uint8(hopLimit),
         Version: uint8(6),
@@ -82,8 +82,8 @@ func buildIPv6UDPLayer(sourceIP, destIP net.IP, hopLimit uint8) *layers.IPv6 {
 	ipV6Layer := &layers.IPv6{
         Version: uint8(6),
         HopLimit: uint8(hopLimit),
-        SrcIP: net.ParseIP(sourceIP),
-        DstIP: net.ParseIP(destIP),
+        SrcIP: sourceIP,
+        DstIP: destIP,
         NextHeader: layers.IPProtocolUDP,
         FlowLabel: uint32(0),
         TrafficClass: uint8(0xc0),
@@ -133,9 +133,9 @@ func buildICMPV6TraceroutePacket(sourceIP, destIP net.IP, hopLimit uint8, payloa
         SeqNumber: seqNumber,
     }
 
-    err = gopacket.SerializeLayers(buf, opts, ipLayer, icmpLayer, icmpEchoLayer, gopacket.Payload(payload)
+    err := gopacket.SerializeLayers(buf, opts, ipLayer, icmpLayer, icmpEchoLayer, gopacket.Payload(payload))
     if err != nil {
-    	return err
+         return err
     }
     return nil
 }
@@ -231,7 +231,7 @@ func CreateRoundTripPacketForPath(path Path, payload []byte, buf gopacket.Serial
 		udpLayer.SetNetworkLayerForChecksum(ipLayer)
 	} else {
 		ipLayer := buildIPv6UDPLayer(path[1], path[0], 255)
-		constructedLayers = append(constructedLayers, ipLayer)
+		constructedLayers[len(constructedLayers) - 1] = ipLayer
 		udpLayer.SetNetworkLayerForChecksum(ipLayer)
 	}
 

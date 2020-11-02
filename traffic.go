@@ -196,7 +196,7 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 		ipv6Layer := packet.Layer(layers.LayerTypeIPv6)
 		ip6, _ := ipv6Layer.(*layers.IPv6)
 
-		if ip4.DstIP.Equal(path[0]) && ip4.SrcIP.Equal(path[1]) {
+		if ip6.DstIP.Equal(path[0]) && ip6.SrcIP.Equal(path[1]) {
 			if payload.ID == id {
 				return true
 			}
@@ -204,11 +204,11 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 		return false
 	}
 
-	listener := Listener{}
+	var listener *Listener
 	if path[0].To4() != nil {
-		listener := NewListener(criteria)
+		listener = NewListener(criteria)
 	} else {
-		listener := NewListener(criteriaV6)
+		listener = NewListener(criteriaV6)
 	}
 	packetMatchChan := tc.RegisterListener(listener)
 

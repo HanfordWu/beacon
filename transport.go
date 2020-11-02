@@ -20,6 +20,7 @@ type TransportChannel struct {
 	listenerMap  *ListenerMap
 	packets      chan gopacket.Packet
 	socketFD     int
+        socket6FD    int
 	deviceName   string
 	snaplen      int
 	bufferSize   int
@@ -129,6 +130,13 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 	}
 	tc.socketFD = fd
 
+        fd6, err := syscall.Socket(syscall.AF_INET6, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
+        if err != nil {
+                return nil, fmt.Errorf("Failed to create socket for TransportChannel: %s", err)
+        }
+        tc.socket6FD = fd6
+
+
 	if tc.useListeners {
 		// activate listeners
 		go func() {
@@ -199,18 +207,18 @@ func (tc *TransportChannel) packetsToChannel() {
 
 // SendTo sends a packet to the specified ip address
 func (tc *TransportChannel) SendTo(packetData []byte, destAddr net.IP) error {
-	destAddr = destAddr.To4()
-	err := errors.New()
-	if destAddr == nil {
+	destAddr4 := destAddr.To4()
+	var err error
+	if destAddr4 == nil {
 		//return errors.New("dest IP must be an ipv4 address")
-		destAddr = destAddr.To16()
+		destAddr16 := destAddr.To16()
 		addr := syscall.SockaddrInet6{
-        	Addr: [16]byte{dst_addr_16[0], dst_addr_16[1], dst_addr_16[2], dst_addr_16[3], dst_addr_16[4], dst_addr_16[5], dst_addr_16[6], dst_addr_16[7], dst_addr_16[8], dst_addr_16[9], dst_addr_16[10], dst_addr_16[11], dst_addr_16[12], dst_addr_16[13], dst_addr_16[14], dst_addr_16[15]},
-    	}
-    	err = syscall.Sendto(tc.socketFD, packetData, 0, &addr)
+                    Addr: [16]byte{destAddr16[0], destAddr16[1], destAddr16[2], destAddr16[3], destAddr16[4], destAddr16[5], destAddr16[6], destAddr16[7], destAddr16[8], destAddr16[9], destAddr16[10], destAddr16[11], destAddr16[12], destAddr16[13], destAddr16[14], destAddr16[15]},
+	}
+		err = syscall.Sendto(tc.socket6FD, packetData, 0, &addr)
 	} else {
 		addr := syscall.SockaddrInet4{
-			Addr: [4]byte{destAddr[0], destAddr[1], destAddr[2], destAddr[3]},
+			Addr: [4]byte{destAddr4[0], destAddr4[1], destAddr4[2], destAddr4[3]},
 		}
 		err = syscall.Sendto(tc.socketFD, packetData, 0, &addr)
 	}

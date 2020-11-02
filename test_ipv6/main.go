@@ -13,6 +13,7 @@ import (
     "syscall"
     "strings"
     "math/rand"
+    "github.com/trstruth/beacon"
 )
 
 var (
@@ -300,32 +301,39 @@ func main() { // src_device, dst_device, src_ip, dst_ip, src_mac, nxt_mac
     fmt.Println(dst_ip)
 
     //var filter string = "udp and port 25305"
-    filter := "ip6"
+    filter := "udp"
     read := make(chan bool, 1)
     listen_handle := listen_packet(src_device, snapshot_len, promiscuous, timeout, filter, read)
     defer listen_handle.Close()
 
-    //packetDataWithEth := craft_udp_packet(src_ip, dst_ip, src_mac, nxt_mac, true)
-    //packet_to_print := gopacket.NewPacket(packetDataWithEth,layers.LayerTypeEthernet,gopacket.Default,)
-    //send_packet_pcap(packetDataWithEth, src_device, snapshot_len, promiscuous, timeout)
-    //fmt.Println("packetWithEth: ", packet_to_print)
+    var p beacon.Path
+    for _, hopIP := range boomerangPath {
+        p = append(p, net.ParseIP(hopIP))
+    }
+    fmt.Println("path: ", p)
 
-    //packetDataWithoutEth := craft_udp_packet(src_ip, dst_ip, src_mac, nxt_mac, false)
-    //packet_to_print := gopacket.NewPacket(packetDataWithoutEth,layers.LayerTypeIPv6,gopacket.Default,)
-    //fmt.Println("packetWithoutEth: ", packet_to_print)
-    //send_packet_net(packetDataWithoutEth, "ip6:17", "::1", dst_ip)
-
-    //send_packet_syscall(packetDataWithoutEth, dst_ip)
-
-    //icmpDataWithoutEth := craft_icmp_packet(src_ip, dst_ip, 1)
-    //packet_to_print := gopacket.NewPacket(icmpDataWithoutEth,layers.LayerTypeIPv6,gopacket.Default,)
-    //fmt.Println("icmpWithoutEth: ", packet_to_print)
-    //send_packet_syscall(icmpDataWithoutEth, dst_ip)
-
-    boomerangPacketData := craft_ipip_v6_packet(boomerangPath)
-    packet_to_print := gopacket.NewPacket(boomerangPacketData,layers.LayerTypeIPv6,gopacket.Default,)
-    fmt.Println("boomerangPacket: ", packet_to_print)
-    send_packet_syscall(boomerangPacketData, boomerangPath[1])
+    buf := gopacket.NewSerializeBuffer()
+    payload := []byte("This is my packet, not your packet, stop reading me!")
+    err := beacon.CreateRoundTripPacketForPath(p, payload, buf)
+    if err != nil {
+        fmt.Println(err)
+    }
+    boomerangPacketData := buf.Bytes()
+    //var packet_to_print gopacket.Packet
+    if p[0].To4() != nil {
+        packet_to_print := gopacket.NewPacket(boomerangPacketData,layers.LayerTypeIPv4,gopacket.Default,)
+        fmt.Println("boomerangPacket: ", packet_to_print)
+    } else {
+        packet_to_print := gopacket.NewPacket(boomerangPacketData,layers.LayerTypeIPv6,gopacket.Default,)
+        fmt.Println("boomerangPacket: ", packet_to_print)
+    }
+    tc, err := beacon.NewTransportChannel(
+        beacon.WithBPFFilter("udp"),
+    )
+    err = tc.SendToPath(boomerangPacketData, p)
+    if err != nil {
+        fmt.Println(err)
+    }
 
     <-read
 }
