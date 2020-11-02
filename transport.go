@@ -20,7 +20,7 @@ type TransportChannel struct {
 	listenerMap  *ListenerMap
 	packets      chan gopacket.Packet
 	socketFD     int
-        socket6FD    int
+	socket6FD    int
 	deviceName   string
 	snaplen      int
 	bufferSize   int
@@ -130,12 +130,11 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 	}
 	tc.socketFD = fd
 
-        fd6, err := syscall.Socket(syscall.AF_INET6, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
-        if err != nil {
-                return nil, fmt.Errorf("Failed to create socket for TransportChannel: %s", err)
-        }
-        tc.socket6FD = fd6
-
+	fd6, err := syscall.Socket(syscall.AF_INET6, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create socket for TransportChannel: %s", err)
+	}
+	tc.socket6FD = fd6
 
 	if tc.useListeners {
 		// activate listeners
@@ -213,8 +212,8 @@ func (tc *TransportChannel) SendTo(packetData []byte, destAddr net.IP) error {
 		//return errors.New("dest IP must be an ipv4 address")
 		destAddr16 := destAddr.To16()
 		addr := syscall.SockaddrInet6{
-                    Addr: [16]byte{destAddr16[0], destAddr16[1], destAddr16[2], destAddr16[3], destAddr16[4], destAddr16[5], destAddr16[6], destAddr16[7], destAddr16[8], destAddr16[9], destAddr16[10], destAddr16[11], destAddr16[12], destAddr16[13], destAddr16[14], destAddr16[15]},
-	}
+			Addr: [16]byte{destAddr16[0], destAddr16[1], destAddr16[2], destAddr16[3], destAddr16[4], destAddr16[5], destAddr16[6], destAddr16[7], destAddr16[8], destAddr16[9], destAddr16[10], destAddr16[11], destAddr16[12], destAddr16[13], destAddr16[14], destAddr16[15]},
+		}
 		err = syscall.Sendto(tc.socket6FD, packetData, 0, &addr)
 	} else {
 		addr := syscall.SockaddrInet4{

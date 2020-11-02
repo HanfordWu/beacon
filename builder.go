@@ -23,17 +23,17 @@ func buildIPIPLayer(sourceIP, destIP net.IP) *layers.IPv4 {
 }
 
 func buildIPv6IPv6Layer(sourceIP, dstIP net.IP) *layers.IPv6 {
-     ipipv6Layer := &layers.IPv6{
-            Version: uint8(6),
-            HopLimit: uint8(64),
-            SrcIP: sourceIP,
-            DstIP: dstIP,
-            NextHeader: layers.IPProtocolIPv6,
-            FlowLabel: uint32(0),
-            TrafficClass: uint8(0xc0),
-    }
+	ipipv6Layer := &layers.IPv6{
+		Version:      uint8(6),
+		HopLimit:     uint8(64),
+		SrcIP:        sourceIP,
+		DstIP:        dstIP,
+		NextHeader:   layers.IPProtocolIPv6,
+		FlowLabel:    uint32(0),
+		TrafficClass: uint8(0xc0),
+	}
 
-    return ipipv6Layer
+	return ipipv6Layer
 }
 
 func buildIPv4ICMPLayer(sourceIP, destIP net.IP, ttl uint8) *layers.IPv4 {
@@ -52,16 +52,16 @@ func buildIPv4ICMPLayer(sourceIP, destIP net.IP, ttl uint8) *layers.IPv4 {
 
 func buildIPv6ICMPLayer(sourceIP, destIP net.IP, hopLimit uint8) *layers.IPv6 {
 	ipV6Layer := &layers.IPv6{
-        SrcIP: sourceIP,
-        DstIP: destIP,
-        NextHeader: layers.IPProtocolICMPv6,
-        HopLimit: uint8(hopLimit),
-        Version: uint8(6),
-        FlowLabel: uint32(0),
-        TrafficClass: uint8(0xc0),
-    }
+		SrcIP:        sourceIP,
+		DstIP:        destIP,
+		NextHeader:   layers.IPProtocolICMPv6,
+		HopLimit:     uint8(hopLimit),
+		Version:      uint8(6),
+		FlowLabel:    uint32(0),
+		TrafficClass: uint8(0xc0),
+	}
 
-    return ipV6Layer
+	return ipV6Layer
 }
 
 func buildIPv4UDPLayer(sourceIP, destIP net.IP, ttl uint8) *layers.IPv4 {
@@ -80,16 +80,16 @@ func buildIPv4UDPLayer(sourceIP, destIP net.IP, ttl uint8) *layers.IPv4 {
 
 func buildIPv6UDPLayer(sourceIP, destIP net.IP, hopLimit uint8) *layers.IPv6 {
 	ipV6Layer := &layers.IPv6{
-        Version: uint8(6),
-        HopLimit: uint8(hopLimit),
-        SrcIP: sourceIP,
-        DstIP: destIP,
-        NextHeader: layers.IPProtocolUDP,
-        FlowLabel: uint32(0),
-        TrafficClass: uint8(0xc0),
-    }
+		Version:      uint8(6),
+		HopLimit:     uint8(hopLimit),
+		SrcIP:        sourceIP,
+		DstIP:        destIP,
+		NextHeader:   layers.IPProtocolUDP,
+		FlowLabel:    uint32(0),
+		TrafficClass: uint8(0xc0),
+	}
 
-    return ipV6Layer
+	return ipV6Layer
 }
 
 func buildICMPTraceroutePacket(sourceIP, destIP net.IP, ttl uint8, payload []byte, buf gopacket.SerializeBuffer) error {
@@ -125,19 +125,19 @@ func buildICMPV6TraceroutePacket(sourceIP, destIP net.IP, hopLimit uint8, payloa
 	ipLayer := buildIPv6ICMPLayer(sourceIP, destIP, hopLimit)
 
 	icmpLayer := &layers.ICMPv6{
-        TypeCode: layers.CreateICMPv6TypeCode(layers.ICMPv6TypeEchoRequest, 0),
-    }
-    icmpLayer.SetNetworkLayerForChecksum(ipLayer)
-    icmpEchoLayer := &layers.ICMPv6Echo{
-        Identifier: uint16(identifier),
-        SeqNumber: seqNumber,
-    }
+		TypeCode: layers.CreateICMPv6TypeCode(layers.ICMPv6TypeEchoRequest, 0),
+	}
+	icmpLayer.SetNetworkLayerForChecksum(ipLayer)
+	icmpEchoLayer := &layers.ICMPv6Echo{
+		Identifier: uint16(identifier),
+		SeqNumber:  seqNumber,
+	}
 
-    err := gopacket.SerializeLayers(buf, opts, ipLayer, icmpLayer, icmpEchoLayer, gopacket.Payload(payload))
-    if err != nil {
-         return err
-    }
-    return nil
+	err := gopacket.SerializeLayers(buf, opts, ipLayer, icmpLayer, icmpEchoLayer, gopacket.Payload(payload))
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func buildUDPTraceroutePacket(sourceIP, destIP net.IP, ttl uint8, payload []byte, buf gopacket.SerializeBuffer) error {
@@ -231,7 +231,7 @@ func CreateRoundTripPacketForPath(path Path, payload []byte, buf gopacket.Serial
 		udpLayer.SetNetworkLayerForChecksum(ipLayer)
 	} else {
 		ipLayer := buildIPv6UDPLayer(path[1], path[0], 255)
-		constructedLayers[len(constructedLayers) - 1] = ipLayer
+		constructedLayers[len(constructedLayers)-1] = ipLayer
 		udpLayer.SetNetworkLayerForChecksum(ipLayer)
 	}
 
