@@ -200,15 +200,20 @@ func (tc *TransportChannel) packetsToChannel() {
 // SendTo sends a packet to the specified ip address
 func (tc *TransportChannel) SendTo(packetData []byte, destAddr net.IP) error {
 	destAddr = destAddr.To4()
+	err := errors.New()
 	if destAddr == nil {
-		return errors.New("dest IP must be an ipv4 address")
+		//return errors.New("dest IP must be an ipv4 address")
+		destAddr = destAddr.To16()
+		addr := syscall.SockaddrInet6{
+        	Addr: [16]byte{dst_addr_16[0], dst_addr_16[1], dst_addr_16[2], dst_addr_16[3], dst_addr_16[4], dst_addr_16[5], dst_addr_16[6], dst_addr_16[7], dst_addr_16[8], dst_addr_16[9], dst_addr_16[10], dst_addr_16[11], dst_addr_16[12], dst_addr_16[13], dst_addr_16[14], dst_addr_16[15]},
+    	}
+    	err = syscall.Sendto(tc.socketFD, packetData, 0, &addr)
+	} else {
+		addr := syscall.SockaddrInet4{
+			Addr: [4]byte{destAddr[0], destAddr[1], destAddr[2], destAddr[3]},
+		}
+		err = syscall.Sendto(tc.socketFD, packetData, 0, &addr)
 	}
-
-	addr := syscall.SockaddrInet4{
-		Addr: [4]byte{destAddr[0], destAddr[1], destAddr[2], destAddr[3]},
-	}
-
-	err := syscall.Sendto(tc.socketFD, packetData, 0, &addr)
 	if err != nil {
 		return fmt.Errorf("Failed to send packetData to socket: %s", err)
 	}
