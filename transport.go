@@ -126,13 +126,13 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 	// http://man7.org/linux/man-pages/man7/raw.7.html
 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create socket for TransportChannel: %s", err)
+		return nil, fmt.Errorf("Failed to create IPv4 socket for TransportChannel: %s", err)
 	}
 	tc.socketFD = fd
 
 	fd6, err := syscall.Socket(syscall.AF_INET6, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create socket for TransportChannel: %s", err)
+		return nil, fmt.Errorf("Failed to create IPv6 socket for TransportChannel: %s", err)
 	}
 	tc.socket6FD = fd6
 
@@ -206,18 +206,21 @@ func (tc *TransportChannel) packetsToChannel() {
 
 // SendTo sends a packet to the specified ip address
 func (tc *TransportChannel) SendTo(packetData []byte, destAddr net.IP) error {
-	destAddr4 := destAddr.To4()
 	var err error
-	if destAddr4 == nil {
-		//return errors.New("dest IP must be an ipv4 address")
-		destAddr16 := destAddr.To16()
+
+	destAddrTo4 := destAddr.To4()
+	if destAddrTo4 == nil {
+		var destAddr16 [16]byte
+		copy(destAddr16[:], destAddr.To16()[:16])
 		addr := syscall.SockaddrInet6{
-			Addr: [16]byte{destAddr16[0], destAddr16[1], destAddr16[2], destAddr16[3], destAddr16[4], destAddr16[5], destAddr16[6], destAddr16[7], destAddr16[8], destAddr16[9], destAddr16[10], destAddr16[11], destAddr16[12], destAddr16[13], destAddr16[14], destAddr16[15]},
+			Addr: destAddr16,
 		}
 		err = syscall.Sendto(tc.socket6FD, packetData, 0, &addr)
 	} else {
+		var destAddr4 [4]byte
+		copy(destAddr4[:], destAddrTo4)
 		addr := syscall.SockaddrInet4{
-			Addr: [4]byte{destAddr4[0], destAddr4[1], destAddr4[2], destAddr4[3]},
+			Addr: destAddr4,
 		}
 		err = syscall.Sendto(tc.socketFD, packetData, 0, &addr)
 	}

@@ -305,26 +305,27 @@ func main() { // src_device, dst_device, src_ip, dst_ip, src_mac, nxt_mac
 	fmt.Println(dst_ip)
 
 	//var filter string = "udp and port 25305"
-	filter := "udp"
+	filter := "ip6"
 	read := make(chan bool, 1)
 	listen_handle := listen_packet(src_device, snapshot_len, promiscuous, timeout, filter, read)
 	defer listen_handle.Close()
 
-	var p beacon.Path
-	for _, hopIP := range boomerangPath {
-		p = append(p, net.ParseIP(hopIP))
-	}
-	fmt.Println("path: ", p)
+	//var p beacon.Path
+	//for _, hopIP := range boomerangPath {
+	//	p = append(p, net.ParseIP(hopIP))
+	//}
+	//fmt.Println("path: ", p)
 
 	buf := gopacket.NewSerializeBuffer()
 	payload := []byte("This is my packet, not your packet, stop reading me!")
-	err := beacon.CreateRoundTripPacketForPath(p, payload, buf)
+	err := beacon.BuildICMPTraceroutePacket(net.ParseIP(src_ip), net.ParseIP(dst_ip), 64, payload, buf, 0, 69)
+	//err := beacon.CreateRoundTripPacketForPath(p, payload, buf)
 	if err != nil {
 		fmt.Println(err)
 	}
 	boomerangPacketData := buf.Bytes()
 	//var packet_to_print gopacket.Packet
-	if p[0].To4() != nil {
+	if net.ParseIP(src_ip).To4() != nil {
 		packet_to_print := gopacket.NewPacket(boomerangPacketData, layers.LayerTypeIPv4, gopacket.Default)
 		fmt.Println("boomerangPacket: ", packet_to_print)
 	} else {
@@ -332,9 +333,9 @@ func main() { // src_device, dst_device, src_ip, dst_ip, src_mac, nxt_mac
 		fmt.Println("boomerangPacket: ", packet_to_print)
 	}
 	tc, err := beacon.NewTransportChannel(
-		beacon.WithBPFFilter("udp"),
+		beacon.WithBPFFilter("ip6"),
 	)
-	err = tc.SendToPath(boomerangPacketData, p)
+	err = tc.SendTo(boomerangPacketData, net.ParseIP(dst_ip))
 	if err != nil {
 		fmt.Println(err)
 	}

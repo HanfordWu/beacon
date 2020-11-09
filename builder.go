@@ -8,7 +8,7 @@ import (
 	"github.com/google/gopacket/layers"
 )
 
-func buildIPIPLayer(sourceIP, destIP net.IP) *layers.IPv4 {
+func buildIPv4EncapLayer(sourceIP, destIP net.IP) *layers.IPv4 {
 	ipipLayer := &layers.IPv4{
 		Version:  4,
 		IHL:      5,
@@ -22,14 +22,14 @@ func buildIPIPLayer(sourceIP, destIP net.IP) *layers.IPv4 {
 	return ipipLayer
 }
 
-func buildIPv6IPv6Layer(sourceIP, dstIP net.IP) *layers.IPv6 {
+func buildIPv6EncapLayer(sourceIP, dstIP net.IP) *layers.IPv6 {
 	ipipv6Layer := &layers.IPv6{
-		Version:      uint8(6),
-		HopLimit:     uint8(64),
+		Version:      6,
+		HopLimit:     64,
 		SrcIP:        sourceIP,
 		DstIP:        dstIP,
 		NextHeader:   layers.IPProtocolIPv6,
-		FlowLabel:    uint32(0),
+		FlowLabel:    0,
 		TrafficClass: uint8(0xc0),
 	}
 
@@ -55,9 +55,9 @@ func buildIPv6ICMPLayer(sourceIP, destIP net.IP, hopLimit uint8) *layers.IPv6 {
 		SrcIP:        sourceIP,
 		DstIP:        destIP,
 		NextHeader:   layers.IPProtocolICMPv6,
-		HopLimit:     uint8(hopLimit),
-		Version:      uint8(6),
-		FlowLabel:    uint32(0),
+		HopLimit:     hopLimit,
+		Version:      6,
+		FlowLabel:    0,
 		TrafficClass: uint8(0xc0),
 	}
 
@@ -80,19 +80,29 @@ func buildIPv4UDPLayer(sourceIP, destIP net.IP, ttl uint8) *layers.IPv4 {
 
 func buildIPv6UDPLayer(sourceIP, destIP net.IP, hopLimit uint8) *layers.IPv6 {
 	ipV6Layer := &layers.IPv6{
-		Version:      uint8(6),
-		HopLimit:     uint8(hopLimit),
+		Version:      6,
+		HopLimit:     hopLimit,
 		SrcIP:        sourceIP,
 		DstIP:        destIP,
 		NextHeader:   layers.IPProtocolUDP,
-		FlowLabel:    uint32(0),
+		FlowLabel:    0,
 		TrafficClass: uint8(0xc0),
 	}
 
 	return ipV6Layer
 }
 
-func buildICMPTraceroutePacket(sourceIP, destIP net.IP, ttl uint8, payload []byte, buf gopacket.SerializeBuffer) error {
+func BuildICMPTraceroutePacket(sourceIP, destIP net.IP, ttl_hoplimit uint8, payload []byte, buf gopacket.SerializeBuffer, seqNumber, identifier uint16) error {
+	var err error
+	if sourceIP.To4() != nil {
+		err = buildICMPv4TraceroutePacket(sourceIP, destIP, ttl_hoplimit, payload, buf, seqNumber, identifier)
+	} else {
+		err = buildICMPv6TraceroutePacket(sourceIP, destIP, ttl_hoplimit, payload, buf, seqNumber, identifier)
+	}
+	return err
+}
+
+func buildICMPv4TraceroutePacket(sourceIP, destIP net.IP, ttl uint8, payload []byte, buf gopacket.SerializeBuffer, seqNumber, identifier uint16) error {
 	opts := gopacket.SerializeOptions{
 		ComputeChecksums: true,
 		FixLengths:       true,
@@ -102,7 +112,8 @@ func buildICMPTraceroutePacket(sourceIP, destIP net.IP, ttl uint8, payload []byt
 
 	icmpLayer := &layers.ICMPv4{
 		TypeCode: layers.CreateICMPv4TypeCode(layers.ICMPv4TypeEchoRequest, 0),
-		Seq:      1,
+		Seq:      seqNumber,
+		Id:       identifier,
 	}
 
 	err := gopacket.SerializeLayers(buf, opts,
@@ -116,7 +127,7 @@ func buildICMPTraceroutePacket(sourceIP, destIP net.IP, ttl uint8, payload []byt
 	return nil
 }
 
-func buildICMPV6TraceroutePacket(sourceIP, destIP net.IP, hopLimit uint8, payload []byte, buf gopacket.SerializeBuffer, seqNumber, identifier uint16) error {
+func buildICMPv6TraceroutePacket(sourceIP, destIP net.IP, hopLimit uint8, payload []byte, buf gopacket.SerializeBuffer, seqNumber, identifier uint16) error {
 	opts := gopacket.SerializeOptions{
 		ComputeChecksums: true,
 		FixLengths:       true,
@@ -129,7 +140,7 @@ func buildICMPV6TraceroutePacket(sourceIP, destIP net.IP, hopLimit uint8, payloa
 	}
 	icmpLayer.SetNetworkLayerForChecksum(ipLayer)
 	icmpEchoLayer := &layers.ICMPv6Echo{
-		Identifier: uint16(identifier),
+		Identifier: identifier,
 		SeqNumber:  seqNumber,
 	}
 
@@ -171,7 +182,7 @@ func buildEncapTraceroutePacket(outerSourceIP, outerDestIP, innerSourceIP, inner
 		FixLengths:       true,
 	}
 
-	ipipLayer := buildIPIPLayer(outerSourceIP, outerDestIP)
+	ipipLayer := buildIPv4EncapLayer(outerSourceIP, outerDestIP)
 	ipLayer := buildIPv4ICMPLayer(innerSourceIP, innerDestIP, ttl)
 
 	icmpLayer := &layers.ICMPv4{
@@ -211,11 +222,11 @@ func CreateRoundTripPacketForPath(path Path, payload []byte, buf gopacket.Serial
 		hopB := path[idx+1]
 
 		if hopA.To4() != nil {
-			constructedLayers[idx] = buildIPIPLayer(hopA, hopB)
-			constructedLayers[numLayers-idx-1] = buildIPIPLayer(hopB, hopA)
+			constructedLayers[idx] = buildIPv4EncapLayer(hopA, hopB)
+			constructedLayers[numLayers-idx-1] = buildIPv4EncapLayer(hopB, hopA)
 		} else {
-			constructedLayers[idx] = buildIPv6IPv6Layer(hopA, hopB)
-			constructedLayers[numLayers-idx-1] = buildIPv6IPv6Layer(hopB, hopA)
+			constructedLayers[idx] = buildIPv6EncapLayer(hopA, hopB)
+			constructedLayers[numLayers-idx-1] = buildIPv6EncapLayer(hopB, hopA)
 		}
 	}
 
