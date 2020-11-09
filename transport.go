@@ -23,6 +23,7 @@ type TransportChannel struct {
 	portLock      sync.Mutex
 	packets       chan gopacket.Packet
 	socketFD      int
+	socket6FD     int
 	deviceName    string
 	snaplen       int
 	bufferSize    int
@@ -134,9 +135,15 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 	// http://man7.org/linux/man-pages/man7/raw.7.html
 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create socket for TransportChannel: %s", err)
+		return nil, fmt.Errorf("Failed to create IPv4 socket for TransportChannel: %s", err)
 	}
 	tc.socketFD = fd
+
+	fd6, err := syscall.Socket(syscall.AF_INET6, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create IPv6 socket for TransportChannel: %s", err)
+	}
+	tc.socket6FD = fd6
 
 	if tc.useListeners {
 		// activate listeners
@@ -208,16 +215,24 @@ func (tc *TransportChannel) packetsToChannel() {
 
 // SendTo sends a packet to the specified ip address
 func (tc *TransportChannel) SendTo(packetData []byte, destAddr net.IP) error {
-	destAddr = destAddr.To4()
-	if destAddr == nil {
-		return errors.New("dest IP must be an ipv4 address")
-	}
+	var err error
 
-	addr := syscall.SockaddrInet4{
-		Addr: [4]byte{destAddr[0], destAddr[1], destAddr[2], destAddr[3]},
+	destAddrTo4 := destAddr.To4()
+	if destAddrTo4 == nil {
+		var destAddr16 [16]byte
+		copy(destAddr16[:], destAddr.To16()[:16])
+		addr := syscall.SockaddrInet6{
+			Addr: destAddr16,
+		}
+		err = syscall.Sendto(tc.socket6FD, packetData, 0, &addr)
+	} else {
+		var destAddr4 [4]byte
+		copy(destAddr4[:], destAddrTo4)
+		addr := syscall.SockaddrInet4{
+			Addr: destAddr4,
+		}
+		err = syscall.Sendto(tc.socketFD, packetData, 0, &addr)
 	}
-
-	err := syscall.Sendto(tc.socketFD, packetData, 0, &addr)
 	if err != nil {
 		return fmt.Errorf("Failed to send packetData to socket: %s", err)
 	}

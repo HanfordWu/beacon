@@ -94,12 +94,14 @@ func TestRunMatch(t *testing.T) {
 	}
 
 	buf := gopacket.NewSerializeBuffer()
-	err = buildICMPTraceroutePacket(
+	err = BuildICMPTraceroutePacket(
 		net.IP{0, 0, 0, 0},
 		net.IP{0, 0, 0, 0},
 		64,
 		payloadBytes,
 		buf,
+		0,
+		96,
 	)
 	if err != nil {
 		t.Errorf("Failed to create a packet for the test: %s", err)
@@ -135,12 +137,14 @@ func TestRunNoMatch(t *testing.T) {
 	}
 
 	buf := gopacket.NewSerializeBuffer()
-	err = buildICMPTraceroutePacket(
+	err = BuildICMPTraceroutePacket(
 		net.IP{0, 0, 0, 0},
 		net.IP{0, 0, 0, 0},
 		64,
 		payloadBytes,
 		buf,
+		0,
+		96,
 	)
 	if err != nil {
 		t.Errorf("Failed to create a packet for the test: %s", err)
