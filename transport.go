@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand"
 	"net"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -15,18 +17,21 @@ import (
 
 // TransportChannel is a struct which facilitates packet tx/rx
 type TransportChannel struct {
-	handle       *pcap.Handle
-	packetSource *gopacket.PacketSource
-	listenerMap  *ListenerMap
-	packets      chan gopacket.Packet
-	socketFD     int
-	socket6FD    int
-	deviceName   string
-	snaplen      int
-	bufferSize   int
-	filter       string
-	timeout      int
-	useListeners bool
+	handle        *pcap.Handle
+	packetSource  *gopacket.PacketSource
+	listenerMap   *ListenerMap
+	portLock      sync.Mutex
+	packets       chan gopacket.Packet
+	socketFD      int
+	socket6FD     int
+	deviceName    string
+	snaplen       int
+	bufferSize    int
+	srcPortOffset int
+	dstPortOffset int
+	filter        string
+	timeout       int
+	useListeners  bool
 }
 
 // TransportChannelOption modifies a TransportChannel struct
@@ -78,14 +83,18 @@ func UseListeners(useListeners bool) TransportChannelOption {
 
 // NewTransportChannel instantiates a new transport chanel
 func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, error) {
+	rand.Seed(time.Now().UnixNano())
+
 	tc := &TransportChannel{
-		snaplen:      4800,
-		bufferSize:   16 * 1024 * 1024,
-		deviceName:   "any",
-		filter:       "",
-		timeout:      100,
-		listenerMap:  NewListenerMap(),
-		useListeners: true,
+		snaplen:       4800,
+		bufferSize:    16 * 1024 * 1024,
+		deviceName:    "any",
+		filter:        "",
+		timeout:       100,
+		srcPortOffset: rand.Intn(maxPortOffset),
+		dstPortOffset: rand.Intn(maxPortOffset),
+		listenerMap:   NewListenerMap(),
+		useListeners:  true,
 	}
 
 	for _, opt := range options {

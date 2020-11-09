@@ -3,6 +3,7 @@ package beacon
 import (
 	"encoding/json"
 	"sync"
+	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/uuid"
@@ -11,20 +12,41 @@ import (
 // PacketFilter represents a criteria that a packet can be said to meet.
 type PacketFilter func(packet gopacket.Packet, payload *BoomerangPayload) bool
 
-// Listener is represented by a uuid and a criteria
+// MatchedPacket represents a packet which has matched some criteria.
+type MatchedPacket struct {
+	packet      gopacket.Packet
+	rxTimestamp time.Time
+}
+
+// Listener is represented by a uuid and a criteria.
 type Listener struct {
-	id        uuid.UUID
-	Criteria  PacketFilter
-	matchChan chan gopacket.Packet
+	id         uuid.UUID
+	Criteria   PacketFilter
+	matchChan  chan MatchedPacket
+	persistent bool
 }
 
 // NewListener return a new listener with the given criteria,
 // a newly generated uuid and an initialized match channel.
 func NewListener(criteria PacketFilter) *Listener {
 	return &Listener{
-		id:        uuid.New(),
-		Criteria:  criteria,
-		matchChan: make(chan gopacket.Packet, 1),
+		id:         uuid.New(),
+		Criteria:   criteria,
+		matchChan:  make(chan MatchedPacket, 1),
+		persistent: false,
+	}
+}
+
+// NewPersistentListener return a new listener with the given criteria,
+// a newly generated uuid and an initialized match channel.
+// PersistentListener differs from Listener in that it will not be removed
+// when a match is found.
+func NewPersistentListener(criteria PacketFilter) *Listener {
+	return &Listener{
+		id:         uuid.New(),
+		Criteria:   criteria,
+		matchChan:  make(chan MatchedPacket, 1),
+		persistent: true,
 	}
 }
 
@@ -74,6 +96,8 @@ func (lm *ListenerMap) Delete(key uuid.UUID) {
 // Run passes the supplied packet to the criteria func of each listener in the listeners map
 // If the packet matches a listener, it is sent over the mapped channel, and the listener is deleted.
 func (lm *ListenerMap) Run(p gopacket.Packet) {
+	rxTimestamp := time.Now()
+
 	listenersToDelete := make([]*Listener, 0)
 
 	unmarshalledPayload := &BoomerangPayload{}
@@ -87,8 +111,13 @@ func (lm *ListenerMap) Run(p gopacket.Packet) {
 		// packet meets criteria
 
 		if listener.Criteria(p, unmarshalledPayload) {
-			listener.matchChan <- p
-			listenersToDelete = append(listenersToDelete, listener)
+			listener.matchChan <- MatchedPacket{
+				packet:      p,
+				rxTimestamp: rxTimestamp,
+			}
+			if !listener.persistent {
+				listenersToDelete = append(listenersToDelete, listener)
+			}
 		}
 	}
 
@@ -103,14 +132,14 @@ func (lm *ListenerMap) Run(p gopacket.Packet) {
 
 // RegisterListener attaches a packet listener to the current transport channel.
 // When the packet listener finds a packet matching its criteria, the packet will
-// be sent to the caller over the returned channel
-func (tc *TransportChannel) RegisterListener(l *Listener) chan gopacket.Packet {
+// be sent to the caller over the returned channel.
+func (tc *TransportChannel) RegisterListener(l *Listener) chan MatchedPacket {
 	tc.listenerMap.Store(l.id, l)
 
 	return l.matchChan
 }
 
-// UnregisterListener removes an attached listener
+// UnregisterListener removes an attached listener.
 func (tc *TransportChannel) UnregisterListener(l *Listener) uuid.UUID {
 	tc.listenerMap.Delete(l.id)
 

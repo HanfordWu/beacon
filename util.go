@@ -4,8 +4,15 @@ import (
 	"net"
 	"sync"
 
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/routing"
 )
+
+type portPair struct {
+	src layers.UDPPort
+	dst layers.UDPPort
+}
 
 // ParseIPFromString attempts to parse a valid IP address from the supplied string
 // the string can be in the x.x.x.x format or a hostname.
@@ -71,4 +78,15 @@ func merge(resultChannels ...chan BoomerangResult) <-chan BoomerangResult {
 	}()
 
 	return resultChannel
+}
+
+func tracerouteResponseMatchesPortPair(payload []byte, ports portPair) bool {
+	decodedPayloadPacket := gopacket.NewPacket(payload, layers.LayerTypeIPv4, gopacket.Default)
+	if udpLayer := decodedPayloadPacket.Layer(layers.LayerTypeUDP); udpLayer != nil {
+		udp, _ := udpLayer.(*layers.UDP)
+		if udp.SrcPort == ports.src && udp.DstPort == ports.dst {
+			return true
+		}
+	}
+	return false
 }

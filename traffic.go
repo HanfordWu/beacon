@@ -214,13 +214,13 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 
 	go func() {
 		listenerReady <- true
-		for packet := range packetMatchChan {
-			udpLayer := packet.Layer(layers.LayerTypeUDP)
+		for matchedPacket := range packetMatchChan {
+			udpLayer := matchedPacket.packet.Layer(layers.LayerTypeUDP)
 			udp, _ := udpLayer.(*layers.UDP)
 
 			unmarshalledPayload := &BoomerangPayload{}
 			json.Unmarshal(udp.Payload, unmarshalledPayload) // handle unmarshal errors
-			unmarshalledPayload.RxTimestamp = time.Now().UTC()
+			unmarshalledPayload.RxTimestamp = matchedPacket.rxTimestamp
 			seen <- BoomerangResult{
 				Payload: *unmarshalledPayload,
 			}
@@ -235,7 +235,6 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 		timeOutDuration := time.Duration(timeout) * time.Second
 		timer := time.NewTimer(timeOutDuration)
 
-		txTime := time.Now().UTC()
 		err := tc.SendToPath(buf.Bytes(), path)
 		if err != nil {
 			fmt.Printf("error in SendToPath: %s\n", err)
@@ -248,6 +247,7 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 			}
 			return
 		}
+		txTime := time.Now().UTC()
 
 		select {
 		case result := <-seen:
