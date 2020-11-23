@@ -238,6 +238,8 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 		err := tc.SendToPath(buf.Bytes(), path)
 		if err != nil {
 			fmt.Printf("error in SendToPath: %s\n", err)
+			tc.UnregisterListener(listener)
+
 			resultChan <- BoomerangResult{
 				Err:       err,
 				ErrorType: sendError,
@@ -247,6 +249,7 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 			}
 			return
 		}
+
 		txTime := time.Now().UTC()
 
 		select {
