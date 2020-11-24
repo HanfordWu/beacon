@@ -157,8 +157,6 @@ func (tc *TransportChannel) Probe(path Path, numPackets int, timeout int) chan B
 // Boomerang sends one packet which "boomerangs" over a given path.  For example, if the path is A,B,C,D the packet will travel
 // A -> B -> C -> D -> C -> B -> A
 func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
-	listenerReady := make(chan bool)
-	seen := make(chan BoomerangResult)
 	resultChan := make(chan BoomerangResult)
 
 	destHop := path[len(path)-1]
@@ -213,25 +211,6 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 	packetMatchChan := tc.RegisterListener(listener)
 
 	go func() {
-		listenerReady <- true
-		for matchedPacket := range packetMatchChan {
-			udpLayer := matchedPacket.packet.Layer(layers.LayerTypeUDP)
-			udp, _ := udpLayer.(*layers.UDP)
-
-			unmarshalledPayload := &BoomerangPayload{}
-			json.Unmarshal(udp.Payload, unmarshalledPayload) // handle unmarshal errors
-			unmarshalledPayload.RxTimestamp = matchedPacket.rxTimestamp
-			seen <- BoomerangResult{
-				Payload: *unmarshalledPayload,
-			}
-			return
-		}
-	}()
-
-	// tx goroutine
-	go func() {
-		<-listenerReady
-
 		timeOutDuration := time.Duration(timeout) * time.Second
 		timer := time.NewTimer(timeOutDuration)
 
@@ -249,11 +228,18 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 			}
 			return
 		}
-
 		txTime := time.Now().UTC()
 
 		select {
-		case result := <-seen:
+		case matchedPacket := <-packetMatchChan:
+			udpLayer := matchedPacket.packet.Layer(layers.LayerTypeUDP)
+			udp, _ := udpLayer.(*layers.UDP)
+			unmarshalledPayload := &BoomerangPayload{}
+			json.Unmarshal(udp.Payload, unmarshalledPayload) // TODO: use a more efficient deserialization
+			unmarshalledPayload.RxTimestamp = matchedPacket.rxTimestamp
+			result := BoomerangResult{
+				Payload: *unmarshalledPayload,
+			}
 			result.Payload.TxTimestamp = txTime
 			resultChan <- result
 		case <-timer.C:
