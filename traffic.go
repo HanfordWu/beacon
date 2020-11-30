@@ -87,11 +87,13 @@ func (tc *TransportChannel) DiscoverAndProbe(src, dst net.IP, numPackets, timeou
 // ProbeEachHopOfPath probes each hop in a path, but accepts a transport channel as an argument.  This allows the caller to share
 // one transport channel between many calls to Probe.  The supplied tranport channel must have a BPFFilter of "ip proto 4"
 func (tc *TransportChannel) ProbeEachHopOfPath(path Path, numPackets int, timeout int) <-chan BoomerangResult {
-	if !strings.Contains(tc.filter, "ip proto 4") {
+	if !strings.Contains(tc.filter, "ip proto") && !strings.Contains(tc.filter, "ip6") {
 		resultChan := make(chan BoomerangResult)
 
-		errMsg := fmt.Sprintf("The supplied TransportChannel must have a BPFFilter containing ip proto 4. The supplied filter was: %s", tc.filter)
-		resultChan <- BoomerangResult{Err: fmt.Errorf(errMsg), ErrorType: fatal}
+		go func() {
+			errMsg := fmt.Sprintf("The supplied TransportChannel must contain an ip proto or ip6 BPFFilter. The supplied filter was: %s\n", tc.filter)
+			resultChan <- BoomerangResult{Err: fmt.Errorf(errMsg), ErrorType: fatal}
+		}()
 
 		return resultChan
 	}
@@ -101,17 +103,20 @@ func (tc *TransportChannel) ProbeEachHopOfPath(path Path, numPackets int, timeou
 		resultChannels[i-2] = tc.Probe(path[0:i], numPackets, timeout)
 	}
 
+	//two declarations of merge, one in probe.go and one in util.go
 	return merge(resultChannels...)
 }
 
 // ProbeEachHopOfPathSync synchronously probes each hop in a path.  That is, it waits for each round of packets to come
 // back from each hop before sending the next round
 func (tc *TransportChannel) ProbeEachHopOfPathSync(path Path, numPackets int, timeout int) <-chan BoomerangResult {
-	if !strings.Contains(tc.filter, "ip proto 4") {
+	if !strings.Contains(tc.filter, "ip proto") && !strings.Contains(tc.filter, "ip6") {
 		resultChan := make(chan BoomerangResult)
 
-		errMsg := fmt.Sprintf("The supplied TransportChannel must have a BPFFilter containing ip proto 4. The supplied filter was: %s", tc.filter)
-		resultChan <- BoomerangResult{Err: fmt.Errorf(errMsg), ErrorType: fatal}
+		go func() {
+			errMsg := fmt.Sprintf("The supplied TransportChannel must contain an ip proto or ip6 BPFFilter. The supplied filter was: %s\n", tc.filter)
+			resultChan <- BoomerangResult{Err: fmt.Errorf(errMsg), ErrorType: fatal}
+		}()
 
 		return resultChan
 	}
@@ -195,7 +200,11 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 	criteriaV6 := func(packet gopacket.Packet, payload *BoomerangPayload) bool {
 		ipv6Layer := packet.Layer(layers.LayerTypeIPv6)
 		ip6, _ := ipv6Layer.(*layers.IPv6)
-
+		fmt.Println(tc.filter)
+		fmt.Println(packet)
+		fmt.Println(path)
+		fmt.Println(ip6)
+		fmt.Println(ipv6Layer)
 		if ip6.DstIP.Equal(path[0]) && ip6.SrcIP.Equal(path[1]) {
 			if payload.ID == id {
 				return true
@@ -235,7 +244,13 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 		timeOutDuration := time.Duration(timeout) * time.Second
 		timer := time.NewTimer(timeOutDuration)
 
-		err := tc.SendToPath(buf.Bytes(), path)
+		packetData := buf.Bytes()
+		fmt.Println("Boomerang prints")
+		fmt.Println(gopacket.NewPacket(packetData, layers.LayerTypeIPv6, gopacket.Default,))
+		fmt.Println(path)
+		fmt.Println("End boomerang prints")
+
+		err := tc.SendToPath(packetData, path)
 		if err != nil {
 			fmt.Printf("error in SendToPath: %s\n", err)
 			tc.UnregisterListener(listener)

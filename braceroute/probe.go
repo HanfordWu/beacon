@@ -75,11 +75,16 @@ func probeRun(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("%v\n", path)
+	ip_filter := "ip proto 4"
+	if path[0].To4() == nil {
+		ip_filter = "ip6"
+	}
+	fmt.Println("reading " + ip_filter + " packets only")
 
 	stats := newProbeStats(path, numPackets, interfaceDevice)
 
 	tc, err := beacon.NewTransportChannel(
-		beacon.WithBPFFilter("ip proto 4"),
+		beacon.WithBPFFilter(ip_filter),
 		beacon.WithInterface(interfaceDevice),
 		beacon.WithTimeout(100),
 	)
@@ -100,6 +105,7 @@ func probeRun(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	fmt.Printf("starting probe %t %s %d %d \n", block, path, numPackets, timeout)
 	var resultChan <-chan beacon.BoomerangResult
 	if block {
 		resultChan = tc.ProbeEachHopOfPathSync(path, numPackets, timeout)
@@ -107,9 +113,12 @@ func probeRun(cmd *cobra.Command, args []string) error {
 		resultChan = tc.ProbeEachHopOfPath(path, numPackets, timeout)
 	}
 
+	i := 0
 	for res := range resultChan {
+		fmt.Printf("handling %d th item in resultChan\n", i)
 		err := handleResult(res)
 		if err != nil {
+			fmt.Println(err)
 			return err
 		}
 		fmt.Println("\033[H\033[2J")

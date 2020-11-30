@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
+	"github.com/google/gopacket/routing"
 )
 
 // TransportChannel is a struct which facilitates packet tx/rx
@@ -292,13 +293,19 @@ func (tc *TransportChannel) Version() string {
 
 // FindSourceIPForDest finds the IP of the interface device of the TransportChannel instance
 func (tc *TransportChannel) FindSourceIPForDest(dest net.IP) (net.IP, error) {
-	conn, err := net.Dial("udp", fmt.Sprintf("%s:80", dest))
+	router, err := routing.New()
+	_, _, sourceIP, err := router.Route(dest)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to dial dest ip %s: %s", dest, err)
+		return nil, err
 	}
-	defer conn.Close()
 
-	sourceIP := conn.LocalAddr().(*net.UDPAddr).IP
+	//conn, err := net.Dial("udp", fmt.Sprintf("%s:80", dest))
+	//if err != nil {
+	//	return nil, fmt.Errorf("Failed to dial dest ip %s: %s", dest, err)
+	//}
+	//defer conn.Close()
+
+	//sourceIP := conn.LocalAddr().(*net.UDPAddr).IP
 
 	return sourceIP, nil
 }
