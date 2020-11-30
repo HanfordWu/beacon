@@ -24,7 +24,9 @@ type TransportChannel struct {
 	portLock      sync.Mutex
 	packets       chan gopacket.Packet
 	socketFD      int
+	socketFailureMsgQueue chan int
 	socket6FD     int
+	socket6FailureMsgQueue chan int
 	deviceName    string
 	snaplen       int
 	bufferSize    int
@@ -139,12 +141,16 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 		return nil, fmt.Errorf("Failed to create IPv4 socket for TransportChannel: %s", err)
 	}
 	tc.socketFD = fd
+	tc.socketFailureMsgQueue = make(chan int)
+	go tc.renewSocketFD()
 
 	fd6, err := syscall.Socket(syscall.AF_INET6, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create IPv6 socket for TransportChannel: %s", err)
 	}
 	tc.socket6FD = fd6
+	tc.socket6FailureMsgQueue = make(chan int)
+	go tc.renewSocket6FD()
 
 	if tc.useListeners {
 		// activate listeners
@@ -156,6 +162,41 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 	}
 
 	return tc, nil
+}
+
+func (tc *TransportChannel) renewSocketFD() error {
+	for true {
+		brokenFD := <-tc.socketFailureMsgQueue
+		if brokenFD != tc.socketFD {
+			continue
+		} else {
+			fmt.Println("Renewing SocketFD")
+			fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
+			if err != nil {
+				return fmt.Errorf("Failed to create IPv4 socket for TransportChannel: %s", err)
+			}
+		        tc.socketFD = fd
+
+		}
+	}
+	return nil
+}
+
+func (tc *TransportChannel) renewSocket6FD() error {
+	for true {
+		broken6FD := <-tc.socket6FailureMsgQueue
+		if broken6FD != tc.socket6FD {
+			continue
+		} else {
+			fmt.Println("Renewing socket6FD")
+			fd6, err := syscall.Socket(syscall.AF_INET6, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
+		        if err != nil {
+				return fmt.Errorf("Failed to create IPv6 socket for TransportChannel: %s", err)
+			}
+			tc.socket6FD = fd6
+		}
+	}
+	return nil
 }
 
 // Stats displays the stats exposed by the underlying packet handle of a TransportChannel.
@@ -225,17 +266,24 @@ func (tc *TransportChannel) SendTo(packetData []byte, destAddr net.IP) error {
 		addr := syscall.SockaddrInet6{
 			Addr: destAddr16,
 		}
-		err = syscall.Sendto(tc.socket6FD, packetData, 0, &addr)
+		fd6Int := tc.socket6FD
+		err = syscall.Sendto(fd6Int, packetData, 0, &addr)
+		if err != nil {
+			tc.socket6FailureMsgQueue <- fd6Int
+			return fmt.Errorf("Failed to send packetData to socket6FD: %s", err)
+		}
 	} else {
 		var destAddr4 [4]byte
 		copy(destAddr4[:], destAddrTo4)
 		addr := syscall.SockaddrInet4{
 			Addr: destAddr4,
 		}
-		err = syscall.Sendto(tc.socketFD, packetData, 0, &addr)
-	}
-	if err != nil {
-		return fmt.Errorf("Failed to send packetData to socket: %s", err)
+		fdInt := tc.socketFD
+		err = syscall.Sendto(fdInt, packetData, 0, &addr)
+		if err != nil {
+			tc.socketFailureMsgQueue <- fdInt
+			return fmt.Errorf("Failed to send packetData to socketFD: %s", err)
+		}
 	}
 	return nil
 }
