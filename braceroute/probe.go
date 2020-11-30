@@ -105,7 +105,6 @@ func probeRun(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	fmt.Printf("starting probe %t %s %d %d \n", block, path, numPackets, timeout)
 	var resultChan <-chan beacon.BoomerangResult
 	if block {
 		resultChan = tc.ProbeEachHopOfPathSync(path, numPackets, timeout)
@@ -113,12 +112,9 @@ func probeRun(cmd *cobra.Command, args []string) error {
 		resultChan = tc.ProbeEachHopOfPath(path, numPackets, timeout)
 	}
 
-	i := 0
 	for res := range resultChan {
-		fmt.Printf("handling %d th item in resultChan\n", i)
 		err := handleResult(res)
 		if err != nil {
-			fmt.Println(err)
 			return err
 		}
 		fmt.Println("\033[H\033[2J")

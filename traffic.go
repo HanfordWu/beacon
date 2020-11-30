@@ -200,11 +200,6 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 	criteriaV6 := func(packet gopacket.Packet, payload *BoomerangPayload) bool {
 		ipv6Layer := packet.Layer(layers.LayerTypeIPv6)
 		ip6, _ := ipv6Layer.(*layers.IPv6)
-		fmt.Println(tc.filter)
-		fmt.Println(packet)
-		fmt.Println(path)
-		fmt.Println(ip6)
-		fmt.Println(ipv6Layer)
 		if ip6.DstIP.Equal(path[0]) && ip6.SrcIP.Equal(path[1]) {
 			if payload.ID == id {
 				return true
@@ -245,10 +240,6 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 		timer := time.NewTimer(timeOutDuration)
 
 		packetData := buf.Bytes()
-		fmt.Println("Boomerang prints")
-		fmt.Println(gopacket.NewPacket(packetData, layers.LayerTypeIPv6, gopacket.Default,))
-		fmt.Println(path)
-		fmt.Println("End boomerang prints")
 
 		err := tc.SendToPath(packetData, path)
 		if err != nil {
