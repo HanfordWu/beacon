@@ -56,7 +56,7 @@ func GetInterfaceDeviceFromDestIP(destIP net.IP) (string, error) {
 	return iface.Name, nil
 }
 
-func merge(resultChannels ...chan BoomerangResult) <-chan BoomerangResult {
+func Merge(resultChannels ...chan BoomerangResult) <-chan BoomerangResult {
 	var wg sync.WaitGroup
 	resultChannel := make(chan BoomerangResult)
 
@@ -80,9 +80,15 @@ func merge(resultChannels ...chan BoomerangResult) <-chan BoomerangResult {
 	return resultChannel
 }
 
-func tracerouteResponseMatchesPortPair(payload []byte, ports portPair) bool {
-	decodedPayloadPacket := gopacket.NewPacket(payload, layers.LayerTypeIPv4, gopacket.Default)
-	if udpLayer := decodedPayloadPacket.Layer(layers.LayerTypeUDP); udpLayer != nil {
+func tracerouteResponseMatchesPortPair(payload []byte, ports portPair, isV4 bool) bool {
+	layerType := layers.LayerTypeIPv4
+	if !isV4 {
+		layerType = layers.LayerTypeIPv6
+		payload = payload[4:]
+	}
+	decodedPayloadPacket := gopacket.NewPacket(payload, layerType, gopacket.Default)
+	udpLayer := decodedPayloadPacket.Layer(layers.LayerTypeUDP)
+	if udpLayer != nil {
 		udp, _ := udpLayer.(*layers.UDP)
 		if udp.SrcPort == ports.src && udp.DstPort == ports.dst {
 			return true

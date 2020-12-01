@@ -3,6 +3,7 @@ package beacon
 import (
 	"errors"
 	"fmt"
+	"log"
 	"io"
 	"math/rand"
 	"net"
@@ -13,28 +14,27 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
-	"github.com/google/gopacket/routing"
 )
 
 // TransportChannel is a struct which facilitates packet tx/rx
 type TransportChannel struct {
-	handle        *pcap.Handle
-	packetSource  *gopacket.PacketSource
-	listenerMap   *ListenerMap
-	portLock      sync.Mutex
-	packets       chan gopacket.Packet
-	socketFD      int
-	socketFailureMsgQueue chan int
-	socket6FD     int
+	handle                 *pcap.Handle
+	packetSource           *gopacket.PacketSource
+	listenerMap            *ListenerMap
+	portLock               sync.Mutex
+	packets                chan gopacket.Packet
+	socketFD               int
+	socketFailureMsgQueue  chan int
+	socket6FD              int
 	socket6FailureMsgQueue chan int
-	deviceName    string
-	snaplen       int
-	bufferSize    int
-	srcPortOffset int
-	dstPortOffset int
-	filter        string
-	timeout       int
-	useListeners  bool
+	deviceName             string
+	snaplen                int
+	bufferSize             int
+	srcPortOffset          int
+	dstPortOffset          int
+	filter                 string
+	timeout                int
+	useListeners           bool
 }
 
 // TransportChannelOption modifies a TransportChannel struct
@@ -165,36 +165,33 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 }
 
 func (tc *TransportChannel) renewSocketFD() error {
-	for true {
+	for {
 		brokenFD := <-tc.socketFailureMsgQueue
 		if brokenFD != tc.socketFD {
 			continue
-		} else {
-			fmt.Println("Renewing SocketFD")
-			fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
-			if err != nil {
-				return fmt.Errorf("Failed to create IPv4 socket for TransportChannel: %s", err)
-			}
-		        tc.socketFD = fd
-
 		}
+		log.Println("Renewing SocketFD")
+		fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
+		if err != nil {
+			return fmt.Errorf("Failed to create IPv4 socket for TransportChannel: %s", err)
+		}
+		tc.socketFD = fd
 	}
 	return nil
 }
 
 func (tc *TransportChannel) renewSocket6FD() error {
-	for true {
+	for {
 		broken6FD := <-tc.socket6FailureMsgQueue
 		if broken6FD != tc.socket6FD {
 			continue
-		} else {
-			fmt.Println("Renewing socket6FD")
-			fd6, err := syscall.Socket(syscall.AF_INET6, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
-		        if err != nil {
-				return fmt.Errorf("Failed to create IPv6 socket for TransportChannel: %s", err)
-			}
-			tc.socket6FD = fd6
 		}
+		log.Println("Renewing socket6FD")
+		fd6, err := syscall.Socket(syscall.AF_INET6, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
+		if err != nil {
+			return fmt.Errorf("Failed to create IPv6 socket for TransportChannel: %s", err)
+		}
+		tc.socket6FD = fd6
 	}
 	return nil
 }
@@ -340,20 +337,21 @@ func (tc *TransportChannel) Version() string {
 }
 
 // FindSourceIPForDest finds the IP of the interface device of the TransportChannel instance
+//TODO: Test router solution in prod canary docker container
 func (tc *TransportChannel) FindSourceIPForDest(dest net.IP) (net.IP, error) {
-	router, err := routing.New()
-	_, _, sourceIP, err := router.Route(dest)
-	if err != nil {
-		return nil, err
-	}
-
-	//conn, err := net.Dial("udp", fmt.Sprintf("%s:80", dest))
+	//router, err := routing.New()
+	//_, _, sourceIP, err := router.Route(dest)
 	//if err != nil {
-	//	return nil, fmt.Errorf("Failed to dial dest ip %s: %s", dest, err)
+	//	return nil, err
 	//}
-	//defer conn.Close()
 
-	//sourceIP := conn.LocalAddr().(*net.UDPAddr).IP
+	conn, err := net.Dial("udp", fmt.Sprintf("%s:80", dest))
+	if err != nil {
+		return nil, fmt.Errorf("Failed to dial dest ip %s: %s", dest, err)
+	}
+	defer conn.Close()
+
+	sourceIP := conn.LocalAddr().(*net.UDPAddr).IP
 
 	return sourceIP, nil
 }

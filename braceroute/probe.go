@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"net"
 	"strings"
-	"sync"
 
 	"github.com/trstruth/beacon"
-
 	"github.com/spf13/cobra"
 )
 
@@ -79,7 +77,7 @@ func probeRun(cmd *cobra.Command, args []string) error {
 	if path[0].To4() == nil {
 		ip_filter = "ip6"
 	}
-	fmt.Println("reading " + ip_filter + " packets only")
+	fmt.Printf("Reading packet using BPF: %s\n", ip_filter)
 
 	stats := newProbeStats(path, numPackets, interfaceDevice)
 
@@ -127,8 +125,13 @@ func probeRun(cmd *cobra.Command, args []string) error {
 func findPathFromSourceToDest() (beacon.Path, error) {
 	var srcIP, destIP net.IP
 
+	filter := "icmp"
+	if destIP.To4() == nil {
+		filter = "icmp6"
+	}
+
 	pathFinderTC, err := beacon.NewTransportChannel(
-		beacon.WithBPFFilter("icmp"),
+		beacon.WithBPFFilter(filter),
 	)
 	if err != nil {
 		return nil, err
@@ -189,28 +192,4 @@ func parsePathFromHopsString(hops string) (beacon.Path, error) {
 		path[idx] = ipAddr
 	}
 	return path, nil
-}
-
-func merge(resultChannels ...chan beacon.BoomerangResult) <-chan beacon.BoomerangResult {
-	var wg sync.WaitGroup
-	resultChannel := make(chan beacon.BoomerangResult)
-
-	drain := func(c chan beacon.BoomerangResult) {
-		for res := range c {
-			resultChannel <- res
-		}
-		wg.Done()
-	}
-
-	wg.Add(len(resultChannels))
-	for _, c := range resultChannels {
-		go drain(c)
-	}
-
-	go func() {
-		wg.Wait()
-		close(resultChannel)
-	}()
-
-	return resultChannel
 }
