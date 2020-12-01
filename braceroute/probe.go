@@ -126,7 +126,7 @@ func findPathFromSourceToDest() (beacon.Path, error) {
 	var srcIP, destIP net.IP
 
 	filter := "icmp"
-	if destIP.To4() == nil {
+	if net.ParseIP(dest).To4() == nil {
 		filter = "icmp6"
 	}
 

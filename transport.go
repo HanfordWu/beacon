@@ -345,7 +345,7 @@ func (tc *TransportChannel) FindSourceIPForDest(dest net.IP) (net.IP, error) {
 	//	return nil, err
 	//}
 
-	conn, err := net.Dial("udp", fmt.Sprintf("%s:80", dest))
+	conn, err := net.Dial("udp", fmt.Sprintf("[%s]:80", dest))
 	if err != nil {
 		return nil, fmt.Errorf("Failed to dial dest ip %s: %s", dest, err)
 	}

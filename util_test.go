@@ -53,7 +53,7 @@ func TestTracerouteResponseMatchesPortPair(t *testing.T) {
 		dst: 33466,
 	}
 
-	if !tracerouteResponseMatchesPortPair(payload, ports) {
+	if !tracerouteResponseMatchesPortPair(payload, ports, true) {
 		t.Errorf("tracerouteResponse ports matched the test input, but the function failed to correctly assess it")
 	}
 }
@@ -71,7 +71,7 @@ func TestInvalidTracerouteResponseMatchesPortPair(t *testing.T) {
 		dst: 00001,
 	}
 
-	if tracerouteResponseMatchesPortPair(payload, ports) {
+	if tracerouteResponseMatchesPortPair(payload, ports, true) {
 		t.Errorf("tracerouteResponse ports didn't match the test input, but the function thought they did")
 	}
 }

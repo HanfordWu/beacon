@@ -131,6 +131,7 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 		return nil, errors.New(errMsg)
 	}
 
+	fmt.Printf("transport channel is using BPF filter: %s\n", tc.filter)
 	fmt.Printf("transport channel is using interface: %s\n", tc.deviceName)
 
 	pathChan := make(PathChannel)
