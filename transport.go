@@ -3,8 +3,8 @@ package beacon
 import (
 	"errors"
 	"fmt"
-	"log"
 	"io"
+	"log"
 	"math/rand"
 	"net"
 	"strings"
@@ -173,9 +173,12 @@ func (tc *TransportChannel) renewSocketFD() error {
 		log.Println("Renewing SocketFD")
 		fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
 		if err != nil {
-			return fmt.Errorf("Failed to create IPv4 socket for TransportChannel: %s", err)
+			log.Printf("Failed to create IPv4 socket for TransportChannel: %s", err)
 		}
 		tc.socketFD = fd
+		if brokenFD != fd {
+			syscall.Close(brokenFD)
+		}
 	}
 	return nil
 }
@@ -189,9 +192,12 @@ func (tc *TransportChannel) renewSocket6FD() error {
 		log.Println("Renewing socket6FD")
 		fd6, err := syscall.Socket(syscall.AF_INET6, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
 		if err != nil {
-			return fmt.Errorf("Failed to create IPv6 socket for TransportChannel: %s", err)
+			log.Printf("Failed to create IPv6 socket for TransportChannel: %s", err)
 		}
 		tc.socket6FD = fd6
+		if broken6FD != fd6 {
+			syscall.Close(broken6FD)
+		}
 	}
 	return nil
 }

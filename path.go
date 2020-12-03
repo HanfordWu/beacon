@@ -166,16 +166,24 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 		for matchedPacket := range packetChan {
 			tcType, tcCode := getTypeAndCode(matchedPacket.packet, isV4)
 			SrcIP, DstIP := getSrcAndDstIP(matchedPacket.packet, isV4)
-			if (isV4 && tcType == 11 && tcCode == 0 && DstIP.Equal(finalSourceIP)) ||
-				(!isV4 && tcType == 3 && tcCode == 0 && DstIP.Equal(finalSourceIP)) {
-				found <- SrcIP
-			} else if (isV4 && tcType == 3 && tcCode == 3 && DstIP.Equal(finalSourceIP)) ||
-				(!isV4 && tcType == 1 && tcCode == 4 && DstIP.Equal(finalSourceIP)) {
-				done <- PathTerminator{
-					secondToLastIP: SrcIP,
-					lastIP:         destIP,
+			if isV4 {
+				if tcType == layers.ICMPv4TypeTimeExceeded && tcCode == layers.ICMPv4CodeTTLExceeded && DstIP.Equal(finalSourceIP) {
+					found <- SrcIP
+				} else if tcType == layers.ICMPv4TypeDestinationUnreachable && tcCode == layers.ICMPv4CodePort && DstIP.Equal(finalSourceIP) {
+					done <- PathTerminator{
+						secondToLastIP: SrcIP,
+						lastIP:         destIP,
+					}
 				}
-				return
+			} else {
+				if tcType == layers.ICMPv6TypeTimeExceeded && tcCode == layers.ICMPv6CodeHopLimitExceeded && DstIP.Equal(finalSourceIP) {
+					found <- SrcIP
+				} else if tcType == layers.ICMPv6TypeDestinationUnreachable && tcCode == layers.ICMPv6CodePortUnreachable && DstIP.Equal(finalSourceIP) {
+					done <- PathTerminator{
+						secondToLastIP: SrcIP,
+						lastIP:         destIP,
+					}
+				}
 			}
 		}
 	}()

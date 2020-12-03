@@ -103,7 +103,6 @@ func (tc *TransportChannel) ProbeEachHopOfPath(path Path, numPackets int, timeou
 		resultChannels[i-2] = tc.Probe(path[0:i], numPackets, timeout)
 	}
 
-	//two declarations of merge, one in probe.go and one in util.go
 	return Merge(resultChannels...)
 }
 
