@@ -80,13 +80,12 @@ func buildIPv4UDPLayer(sourceIP, destIP net.IP, ttl uint8) *layers.IPv4 {
 
 func buildIPv6UDPLayer(sourceIP, destIP net.IP, hopLimit uint8) *layers.IPv6 {
 	ipV6Layer := &layers.IPv6{
-		Version:      6,
-		HopLimit:     hopLimit,
-		SrcIP:        sourceIP,
-		DstIP:        destIP,
-		NextHeader:   layers.IPProtocolUDP,
-		FlowLabel:    0,
-		TrafficClass: uint8(0xc0),
+		Version:    6,
+		HopLimit:   hopLimit,
+		SrcIP:      sourceIP,
+		DstIP:      destIP,
+		NextHeader: layers.IPProtocolUDP,
+		FlowLabel:  0,
 	}
 
 	return ipV6Layer
@@ -152,23 +151,32 @@ func buildICMPv6TraceroutePacket(sourceIP, destIP net.IP, hopLimit uint8, payloa
 }
 
 func buildUDPTraceroutePacket(sourceIP, destIP net.IP, sourcePort, destPort layers.UDPPort, ttl uint8, payload []byte, buf gopacket.SerializeBuffer) error {
+	serializableLayers := make([]gopacket.SerializableLayer, 3)
+
 	opts := gopacket.SerializeOptions{
 		ComputeChecksums: true,
 		FixLengths:       true,
 	}
 
-	ipLayer := buildIPv4UDPLayer(sourceIP, destIP, ttl)
 	udpLayer := &layers.UDP{
 		SrcPort: sourcePort,
 		DstPort: destPort,
 	}
-	udpLayer.SetNetworkLayerForChecksum(ipLayer)
 
-	err := gopacket.SerializeLayers(buf, opts,
-		ipLayer,
-		udpLayer,
-		gopacket.Payload(payload),
-	)
+	if destIP.To4() != nil {
+		ipLayer := buildIPv4UDPLayer(sourceIP, destIP, ttl)
+		udpLayer.SetNetworkLayerForChecksum(ipLayer)
+		serializableLayers[0] = ipLayer
+	} else {
+		ipLayer := buildIPv6UDPLayer(sourceIP, destIP, ttl)
+		udpLayer.SetNetworkLayerForChecksum(ipLayer)
+		serializableLayers[0] = ipLayer
+	}
+
+	serializableLayers[1] = udpLayer
+	serializableLayers[2] = gopacket.Payload(payload)
+
+	err := gopacket.SerializeLayers(buf, opts, serializableLayers...)
 
 	return err
 }

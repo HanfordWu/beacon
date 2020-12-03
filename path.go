@@ -126,11 +126,12 @@ func (tc *TransportChannel) GetPathFromSourceToDest(sourceIP, destIP net.IP, tim
 // GetPathChannelTo returns a PathChannel to a destination IP from the caller
 func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout int) (PathChannel, error) {
 
-	if tc.filter != "icmp" {
-		errMsg := fmt.Sprintf("BPF filter must be icmp: got %s instead", tc.filter)
+	if tc.filter != "icmp" && tc.filter != "icmp6" {
+		errMsg := fmt.Sprintf("BPF filter must be icmp or icmp6: got %s instead", tc.filter)
 		return nil, errors.New(errMsg)
 	}
 
+	fmt.Printf("transport channel is using BPF filter: %s\n", tc.filter)
 	fmt.Printf("transport channel is using interface: %s\n", tc.deviceName)
 
 	pathChan := make(PathChannel)
@@ -147,18 +148,15 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 	} else {
 		finalSourceIP = sourceIP
 	}
+	isV4 := finalSourceIP.To4() != nil
 
 	ports := tc.newTraceroutePortPair()
 
 	criteria := func(packet gopacket.Packet, payload *BoomerangPayload) bool {
-		icmpLayer := packet.Layer(layers.LayerTypeICMPv4)
-		icmp, _ := icmpLayer.(*layers.ICMPv4)
-
-		if !tracerouteResponseMatchesPortPair(icmp.Payload, ports) {
-			// packet is from a different traceroute id
-			return false
-		}
-		return true
+		appLayer := packet.ApplicationLayer()
+		icmpPayload := appLayer.Payload()
+		matches := tracerouteResponseMatchesPortPair(icmpPayload, ports, isV4)
+		return matches
 	}
 
 	listener := NewPersistentListener(criteria)
@@ -166,20 +164,26 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 
 	go func() {
 		for matchedPacket := range packetChan {
-			icmpLayer := matchedPacket.packet.Layer(layers.LayerTypeICMPv4)
-			ipv4Layer := matchedPacket.packet.Layer(layers.LayerTypeIPv4)
-			icmp, _ := icmpLayer.(*layers.ICMPv4)
-			ip4, _ := ipv4Layer.(*layers.IPv4)
-
-			// fmt.Printf("%s -> %s : %s\n", ip4.SrcIP, ip4.DstIP, icmp.TypeCode)
-			if int(icmp.TypeCode) == icmpTTLExceeded && ip4.DstIP.Equal(finalSourceIP) {
-				found <- ip4.SrcIP
-			} else if int(icmp.TypeCode) == icmpPortUnreachable && ip4.DstIP.Equal(finalSourceIP) {
-				done <- PathTerminator{
-					secondToLastIP: ip4.SrcIP,
-					lastIP:         destIP,
+			tcType, tcCode := getTypeAndCode(matchedPacket.packet, isV4)
+			SrcIP, DstIP := getSrcAndDstIP(matchedPacket.packet, isV4)
+			if isV4 {
+				if tcType == layers.ICMPv4TypeTimeExceeded && tcCode == layers.ICMPv4CodeTTLExceeded && DstIP.Equal(finalSourceIP) {
+					found <- SrcIP
+				} else if tcType == layers.ICMPv4TypeDestinationUnreachable && tcCode == layers.ICMPv4CodePort && DstIP.Equal(finalSourceIP) {
+					done <- PathTerminator{
+						secondToLastIP: SrcIP,
+						lastIP:         destIP,
+					}
 				}
-				return
+			} else {
+				if tcType == layers.ICMPv6TypeTimeExceeded && tcCode == layers.ICMPv6CodeHopLimitExceeded && DstIP.Equal(finalSourceIP) {
+					found <- SrcIP
+				} else if tcType == layers.ICMPv6TypeDestinationUnreachable && tcCode == layers.ICMPv6CodePortUnreachable && DstIP.Equal(finalSourceIP) {
+					done <- PathTerminator{
+						secondToLastIP: SrcIP,
+						lastIP:         destIP,
+					}
+				}
 			}
 		}
 	}()
@@ -222,10 +226,32 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 	return pathChan, nil
 }
 
+func getTypeAndCode(packet gopacket.Packet, isV4 bool) (uint8, uint8) {
+	if isV4 {
+		icmp4Layer := packet.Layer(layers.LayerTypeICMPv4)
+		icmp4, _ := icmp4Layer.(*layers.ICMPv4)
+		return icmp4.TypeCode.Type(), icmp4.TypeCode.Code()
+	}
+	icmp6Layer := packet.Layer(layers.LayerTypeICMPv6)
+	icmp6, _ := icmp6Layer.(*layers.ICMPv6)
+	return icmp6.TypeCode.Type(), icmp6.TypeCode.Code()
+}
+
+func getSrcAndDstIP(packet gopacket.Packet, isV4 bool) (net.IP, net.IP) {
+	if isV4 {
+		ipv4Layer := packet.Layer(layers.LayerTypeIPv4)
+		ip4, _ := ipv4Layer.(*layers.IPv4)
+		return ip4.SrcIP, ip4.DstIP
+	}
+	ipv6Layer := packet.Layer(layers.LayerTypeIPv6)
+	ip6, _ := ipv6Layer.(*layers.IPv6)
+	return ip6.SrcIP, ip6.DstIP
+}
+
 // GetPathChannelFrom returns a PathChannel from a destination IP back to the caller
 func (tc *TransportChannel) GetPathChannelFrom(destIP net.IP, timeout int) (PathChannel, error) {
-	if tc.filter != "icmp" {
-		errMsg := fmt.Sprintf("BPF filter must be icmp: got %s instead", tc.filter)
+	if tc.filter != "icmp" && tc.filter != "icmp6" {
+		errMsg := fmt.Sprintf("BPF filter must be icmp or icmp6: got %s instead", tc.filter)
 		return nil, errors.New(errMsg)
 	}
 
@@ -275,7 +301,6 @@ func (tc *TransportChannel) GetPathChannelFrom(destIP net.IP, timeout int) (Path
 			icmp, _ := icmpLayer.(*layers.ICMPv4)
 			ip4, _ := ipv4Layer.(*layers.IPv4)
 
-			// fmt.Printf("%s -> %s : %s\n", ip4.SrcIP, ip4.DstIP, icmp.TypeCode)
 			if int(icmp.TypeCode) == icmpTTLExceeded && ip4.DstIP.Equal(localIP) {
 				found <- ip4.SrcIP
 			} else if int(icmp.TypeCode) == icmpEchoRequest && ip4.SrcIP.Equal(destIP) {
