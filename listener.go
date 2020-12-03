@@ -145,3 +145,11 @@ func (tc *TransportChannel) UnregisterListener(l *Listener) uuid.UUID {
 
 	return l.id
 }
+
+// ListenerCount returns an estimate of how many listeners are registered at
+// a given point in time.  Note that this is only an estimate as we do not
+// acquire the lock of the listenerMap in order to get its count, so the
+// listenerMap may be modified as we are reading it.
+func (tc *TransportChannel) ListenerCount() int {
+    return len(tc.listenerMap.m)
+}
