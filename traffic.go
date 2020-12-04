@@ -233,26 +233,30 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 			}
 			return
 		}
-		txTime := time.Now().UTC()
+		txTimestamp := time.Now().UTC()
 
 		select {
 		case matchedPacket := <-packetMatchChan:
-			udpLayer := matchedPacket.packet.Layer(layers.LayerTypeUDP)
+			udpLayer := matchedPacket.Layer(layers.LayerTypeUDP)
 			udp, _ := udpLayer.(*layers.UDP)
 			unmarshalledPayload := &BoomerangPayload{}
 			json.Unmarshal(udp.Payload, unmarshalledPayload) // TODO: use a more efficient deserialization
-			unmarshalledPayload.RxTimestamp = matchedPacket.rxTimestamp
+
+			packetMetadata := matchedPacket.Metadata()
+			unmarshalledPayload.RxTimestamp = packetMetadata.CaptureInfo.Timestamp
+
 			result := BoomerangResult{
 				Payload: *unmarshalledPayload,
 			}
-			result.Payload.TxTimestamp = txTime
+
+			result.Payload.TxTimestamp = txTimestamp
 			resultChan <- result
 		case <-timer.C:
 			tc.UnregisterListener(listener)
 			resultChan <- BoomerangResult{
 				Payload: BoomerangPayload{
 					DestIP:      path[len(path)-1],
-					TxTimestamp: txTime,
+					TxTimestamp: txTimestamp,
 					RxTimestamp: time.Now().UTC(),
 				},
 				Err:       errors.New("timed out waiting for packet from " + path[len(path)-1].String()),
