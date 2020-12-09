@@ -237,11 +237,15 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 
 		select {
 		case matchedPacket := <-packetMatchChan:
+			// extract the udp layer from the matched packet
 			udpLayer := matchedPacket.Layer(layers.LayerTypeUDP)
 			udp, _ := udpLayer.(*layers.UDP)
+
+			// unmarshall the payload into an empty BoomerangPayload struct
 			unmarshalledPayload := &BoomerangPayload{}
 			json.Unmarshal(udp.Payload, unmarshalledPayload) // TODO: use a more efficient deserialization
 
+			// extract the rx timestamp from the packet metadta
 			packetMetadata := matchedPacket.Metadata()
 			unmarshalledPayload.RxTimestamp = packetMetadata.CaptureInfo.Timestamp
 
