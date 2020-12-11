@@ -151,5 +151,5 @@ func (tc *TransportChannel) UnregisterListener(l *Listener) uuid.UUID {
 // acquire the lock of the listenerMap in order to get its count, so the
 // listenerMap may be modified as we are reading it.
 func (tc *TransportChannel) ListenerCount() int {
-    return len(tc.listenerMap.m)
+	return len(tc.listenerMap.m)
 }

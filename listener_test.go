@@ -164,9 +164,9 @@ func TestRunNoMatch(t *testing.T) {
 }
 
 func TestListenerCount(t *testing.T) {
-    tc := TransportChannel{
-        listenerMap: NewListenerMap(),
-    }
+	tc := TransportChannel{
+		listenerMap: NewListenerMap(),
+	}
 
 	l := NewListener(func(p gopacket.Packet, payload *BoomerangPayload) bool {
 		if payload.ID == "test ID" {
@@ -175,19 +175,19 @@ func TestListenerCount(t *testing.T) {
 		return false
 	})
 
-    tc.RegisterListener(l)
+	tc.RegisterListener(l)
 
-    numListeners := tc.ListenerCount()
+	numListeners := tc.ListenerCount()
 
-    if tc.ListenerCount() != 1 {
-        t.Errorf("Registered one listener and expected ListenerCount() to be 1, got %d instead", numListeners)
-    }
+	if tc.ListenerCount() != 1 {
+		t.Errorf("Registered one listener and expected ListenerCount() to be 1, got %d instead", numListeners)
+	}
 
-    tc.UnregisterListener(l)
+	tc.UnregisterListener(l)
 
-    numListeners = tc.ListenerCount()
+	numListeners = tc.ListenerCount()
 
-    if tc.ListenerCount() != 0 {
-        t.Errorf("Unregistered all listeners and expected ListenerCount() to be 0, got %d instead", numListeners)
-    }
+	if tc.ListenerCount() != 0 {
+		t.Errorf("Unregistered all listeners and expected ListenerCount() to be 0, got %d instead", numListeners)
+	}
 }
