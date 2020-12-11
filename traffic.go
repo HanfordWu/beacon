@@ -202,7 +202,7 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 		ipv6Layer := packet.Layer(layers.LayerTypeIPv6)
 		ip6, _ := ipv6Layer.(*layers.IPv6)
 		if ip6 == nil {
-			return nil
+			return false
 		}
 		if ip6.DstIP.Equal(path[0]) && ip6.SrcIP.Equal(path[1]) {
 			if payload.ID == id {
