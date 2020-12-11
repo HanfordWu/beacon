@@ -164,8 +164,8 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 
 	go func() {
 		for matchedPacket := range packetChan {
-			tcType, tcCode := getTypeAndCode(matchedPacket.packet, isV4)
-			SrcIP, DstIP := getSrcAndDstIP(matchedPacket.packet, isV4)
+			tcType, tcCode := getTypeAndCode(matchedPacket, isV4)
+			SrcIP, DstIP := getSrcAndDstIP(matchedPacket, isV4)
 			if isV4 {
 				if tcType == layers.ICMPv4TypeTimeExceeded && tcCode == layers.ICMPv4CodeTTLExceeded && DstIP.Equal(finalSourceIP) {
 					found <- SrcIP
