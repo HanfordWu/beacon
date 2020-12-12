@@ -219,7 +219,7 @@ func CreateRoundTripPacketForPath(path Path, payload []byte, buf gopacket.Serial
 	}
 
 	numHops := len(path)
-	numLayers := 2*(numHops-1) - 1
+	numLayers := 2*(numHops-1)
 	constructedLayers := make([]gopacket.SerializableLayer, numLayers)
 
 	for idx := range path[:len(path)-1] {
@@ -228,15 +228,10 @@ func CreateRoundTripPacketForPath(path Path, payload []byte, buf gopacket.Serial
 
 		if hopA.To4() != nil {
 			constructedLayers[idx] = buildIPv4EncapLayer(hopA, hopB)
-			if idx != 0 {
-				// don't need a final ipip layer
-				constructedLayers[numLayers-idx] = buildIPv4EncapLayer(hopB, hopA)
-			}
+			constructedLayers[numLayers-idx-1] = buildIPv4EncapLayer(hopB, hopA)
 		} else {
 			constructedLayers[idx] = buildIPv6EncapLayer(hopA, hopB)
-			if idx != 0 {
-				constructedLayers[numLayers-idx] = buildIPv6EncapLayer(hopB, hopA)
-			}
+			constructedLayers[numLayers-idx-1] = buildIPv6EncapLayer(hopB, hopA)
 		}
 	}
 
@@ -248,7 +243,7 @@ func CreateRoundTripPacketForPath(path Path, payload []byte, buf gopacket.Serial
 
 	if path[0].To4() != nil {
 		ipLayer := buildIPv4UDPLayer(path[1], path[0], 255)
-		constructedLayers = append(constructedLayers, ipLayer)
+		constructedLayers[len(constructedLayers)-1] = ipLayer // overwrite the last encap layer
 		udpLayer.SetNetworkLayerForChecksum(ipLayer)
 	} else {
 		ipLayer := buildIPv6UDPLayer(path[1], path[0], 255)
