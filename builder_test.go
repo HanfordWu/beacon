@@ -9,9 +9,10 @@ import (
 	"github.com/google/gopacket/layers"
 )
 
-type SrcDstTuple struct {
-	src net.IP
-	dst net.IP
+type LayerInfo struct {
+	src   net.IP
+	dst   net.IP
+	proto layers.IPProtocol
 }
 
 func TestCreateRoundTripPacketForPath(t *testing.T) {
@@ -31,7 +32,7 @@ func TestCreateRoundTripPacketForPath(t *testing.T) {
 	bufLayers := buf.Layers()
 
 	actualNumLayers := len(bufLayers)
-	expectedNumLayers := (len(path) * 2) + 1 // len(path) * 2 - 1 + 2
+	expectedNumLayers := (len(path) * 2)
 	if actualNumLayers != expectedNumLayers {
 		t.Errorf("Expected the created packet to have %d layers, got %d layers", expectedNumLayers, actualNumLayers)
 	}
@@ -46,30 +47,35 @@ func TestCreateRoundTripPacketForPath(t *testing.T) {
 
 	// if path is A, B, C then expected round trip is
 	// A -> B -> C -> B -> A
-	expectedSrcDstTuples := []SrcDstTuple{
-		SrcDstTuple{src: net.IP{10, 20, 30, 96}, dst: net.IP{104, 44, 22, 235}},
-		SrcDstTuple{src: net.IP{104, 44, 22, 235}, dst: net.IP{104, 44, 19, 212}},
-		SrcDstTuple{src: net.IP{104, 44, 19, 212}, dst: net.IP{104, 44, 22, 235}},
-		SrcDstTuple{src: net.IP{104, 44, 22, 235}, dst: net.IP{10, 20, 30, 96}},
+	expectedLayerInfos := []LayerInfo{
+		LayerInfo{src: net.IP{10, 20, 30, 96}, dst: net.IP{104, 44, 22, 235}, proto: 4},
+		LayerInfo{src: net.IP{104, 44, 22, 235}, dst: net.IP{104, 44, 19, 212}, proto: 4},
+		LayerInfo{src: net.IP{104, 44, 19, 212}, dst: net.IP{104, 44, 22, 235}, proto: 4},
+		LayerInfo{src: net.IP{104, 44, 22, 235}, dst: net.IP{10, 20, 30, 96}, proto: 17},
 	}
 
-	// iterate over packet layers, skip last IPv4 layer, udp and payload
+	// iterate over packet layers, skip udp and payload
 	for idx, l := range packet.Layers()[:4] {
 		ip4, _ := l.(*layers.IPv4)
 
 		actualSrc := ip4.SrcIP
 		actualDst := ip4.DstIP
+		actualProto := ip4.Protocol
 
-		t.Logf("layer %d: %s -> %s\n", idx, actualSrc, actualDst)
+		t.Logf("layer %d: %s -> %s, %s\n", idx, actualSrc, actualDst, actualProto)
 
-		expectedSrc := expectedSrcDstTuples[idx].src
-		expectedDst := expectedSrcDstTuples[idx].dst
+		expectedSrc := expectedLayerInfos[idx].src
+		expectedDst := expectedLayerInfos[idx].dst
+		expectedProto := expectedLayerInfos[idx].proto
 
 		if !actualSrc.Equal(expectedSrc) {
 			t.Errorf("Mismatch while checking src IP of layer %d in constructed packet, expected %s, got %s", idx, expectedSrc, actualSrc)
 		}
 		if !actualDst.Equal(expectedDst) {
 			t.Errorf("Mismatch while checking dst IP of layer %d in constructed packet, expected %s, got %s", idx, expectedDst, actualDst)
+		}
+		if actualProto != expectedProto {
+			t.Errorf("Mismatch while checking protocol of layer %d in constructed packet, expected %s, got %s", idx, expectedProto, actualProto)
 		}
 	}
 }

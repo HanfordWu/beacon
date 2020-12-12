@@ -243,7 +243,7 @@ func CreateRoundTripPacketForPath(path Path, payload []byte, buf gopacket.Serial
 
 	if path[0].To4() != nil {
 		ipLayer := buildIPv4UDPLayer(path[1], path[0], 255)
-		constructedLayers = append(constructedLayers, ipLayer)
+		constructedLayers[len(constructedLayers)-1] = ipLayer // overwrite the last encap layer
 		udpLayer.SetNetworkLayerForChecksum(ipLayer)
 	} else {
 		ipLayer := buildIPv6UDPLayer(path[1], path[0], 255)

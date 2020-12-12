@@ -73,7 +73,7 @@ func probeRun(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("%v\n", path)
-	ip_filter := "ip proto 4"
+	ip_filter := "ip"
 	if path[0].To4() == nil {
 		ip_filter = "ip6"
 	}
