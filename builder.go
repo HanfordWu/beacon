@@ -219,7 +219,7 @@ func CreateRoundTripPacketForPath(path Path, payload []byte, buf gopacket.Serial
 	}
 
 	numHops := len(path)
-	numLayers := 2*(numHops-1)
+	numLayers := 2 * (numHops - 1)
 	constructedLayers := make([]gopacket.SerializableLayer, numLayers)
 
 	for idx := range path[:len(path)-1] {
