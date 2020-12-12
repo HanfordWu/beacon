@@ -185,7 +185,9 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 	criteria := func(packet gopacket.Packet, payload *BoomerangPayload) bool {
 		ipv4Layer := packet.Layer(layers.LayerTypeIPv4)
 		ip4, _ := ipv4Layer.(*layers.IPv4)
-
+		if ip4 == nil {
+			return false
+		}
 		if ip4.DstIP.Equal(path[0]) && ip4.SrcIP.Equal(path[1]) {
 			if payload.ID == id {
 				return true
@@ -197,6 +199,9 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 	criteriaV6 := func(packet gopacket.Packet, payload *BoomerangPayload) bool {
 		ipv6Layer := packet.Layer(layers.LayerTypeIPv6)
 		ip6, _ := ipv6Layer.(*layers.IPv6)
+		if ip6 == nil {
+			return false
+		}
 		if ip6.DstIP.Equal(path[0]) && ip6.SrcIP.Equal(path[1]) {
 			if payload.ID == id {
 				return true
