@@ -73,6 +73,7 @@ func buildIPv4UDPLayer(sourceIP, destIP net.IP, ttl uint8) *layers.IPv4 {
 		Protocol: layers.IPProtocolUDP,
 		SrcIP:    sourceIP,
 		DstIP:    destIP,
+		Id:       109,
 	}
 
 	return ipLayer
