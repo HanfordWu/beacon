@@ -166,7 +166,8 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 
 // NewBoomerangTransportChannel instantiates a new transport channel with an ip packet header (id:109) for the bpf 
 func NewBoomerangTransportChannel(options ...TransportChannelOption) (*TransportChannel, error){
-	return NewTransportChannel(options, WithBPFFilter("(ip && ip[4:2]=0x6D) or ip6"))
+	options = append(options, WithBPFFilter("(ip && ip[4:2]=0x6D) or ip6"))
+	return NewTransportChannel(options...)
 }
 
 func (tc *TransportChannel) renewSocketFD() error {
