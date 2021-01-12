@@ -152,7 +152,7 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 
 	ports := tc.newTraceroutePortPair()
 
-	criteria := func(packet gopacket.Packet, payload *BoomerangPayload) bool {
+	criteria := func(packet gopacket.Packet, id []byte) bool {
 		appLayer := packet.ApplicationLayer()
 		icmpPayload := appLayer.Payload()
 		matches := tracerouteResponseMatchesPortPair(icmpPayload, ports, isV4)
