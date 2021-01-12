@@ -20,4 +20,4 @@ RUN ln -s /usr/lib/libpcap.so.1.9.1 /usr/lib/libpcap.so.0.8
 COPY --from=builder /go/src/github.com/trstruth/beacon/beacon.test .
 
 # run benchmarks
-CMD ["./beacon.test", "-test.bench", "."]
+CMD ["./beacon.test", "-test.bench", ".", "-test.cpuprofile=/moby-bench-results/cpuprof.out", "-test.memprofile=/moby-bench-results/memprof.out"]

@@ -15,15 +15,15 @@ func BenchmarkBoomerang(b *testing.B) {
 		b.FailNow()
 	}
 
-	testSize := 100
+	testSize := 1000
 	testPaths := make([]Path, testSize)
 
 	for i := 0; i < testSize; i++ {
 		testPaths[i] = Path{
 			// hardcoded to work in a specific crystalnet env
 			// might be useful to generalize this in some way
-			net.IP{192, 168, 0, 19},
-			net.IP{192, 168, 255, 253},
+			net.IP{13, 106, 238, 13},
+			net.IP{207, 46, 33, 175},
 		}
 	}
 
