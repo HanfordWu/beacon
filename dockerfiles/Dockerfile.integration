@@ -1,0 +1,23 @@
+FROM golang:1.15.6-alpine3.12 AS builder
+
+RUN apk update && apk add build-base libpcap-dev
+
+COPY . /go/src/github.com/trstruth/beacon
+
+WORKDIR /go/src/github.com/trstruth/beacon
+
+RUN go test -c
+
+FROM alpine:3.12
+
+RUN apk update && apk add libpcap
+
+RUN mkdir /lib64
+
+RUN ln -s /lib/libc.musl-x86_64.so.1 /lib64/ld-linux-x86-64.so.2
+RUN ln -s /usr/lib/libpcap.so.1.9.1 /usr/lib/libpcap.so.0.8
+
+COPY --from=builder /go/src/github.com/trstruth/beacon/beacon.test .
+
+# run benchmarks
+CMD ["./beacon.test", "-test.bench", ".", "-test.cpuprofile=/moby-bench-results/cpuprof.out", "-test.memprofile=/moby-bench-results/memprof.out"]
