@@ -75,7 +75,7 @@ func probeRun(cmd *cobra.Command, args []string) error {
 	fmt.Printf("%v\n", path)
 	stats := newProbeStats(path, numPackets, interfaceDevice)
 
-	fmt.Printf("Reading packet using BPF: %s\n", "(ip && ip[4:2]=0x6D) || (ip6 && ip[2:2] = 0x6D")
+	fmt.Printf("Reading packet using BPF: %s\n", "(ip && ip[4:2]=0x6D) || (ip6 && ip6[2:2] = 0x6D")
 	tc, err := beacon.NewBoomerangTransportChannel(
 		beacon.WithInterface(interfaceDevice),
 	)
