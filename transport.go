@@ -164,9 +164,15 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 	return tc, nil
 }
 
-// NewBoomerangTransportChannel instantiates a new transport channel with an ip packet header (id:109) for the bpf 
-func NewBoomerangTransportChannel(options ...TransportChannelOption) (*TransportChannel, error){
-	options = append(options, WithBPFFilter("(ip && ip[4:2]=0x6D) or ip6"))
+// NewBoomerangTransportChannel instantiates a new transport channel with an ip packet header (id:109) for the bpf
+func NewBoomerangTransportChannel(isIpv6 bool, options ...TransportChannelOption) (*TransportChannel, error) {
+	if isIpv6 {
+		options = append(options, WithBPFFilter("ip6"))
+		fmt.Printf("Reading packet using BPF: %s\n", "ip6")
+	} else {
+		options = append(options, WithBPFFilter("(ip && ip[4:2]=0x6D)"))
+		fmt.Printf("Reading packet using BPF: %s\n", "(ip && ip[4:2]=0x6D)")
+	}
 	return NewTransportChannel(options...)
 }
 

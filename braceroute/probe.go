@@ -73,19 +73,14 @@ func probeRun(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("%v\n", path)
-	ip_filter := "ip && ip[4:2]=0x6D"
-	if path[0].To4() == nil {
-		ip_filter = "ip6"
-	}
-	fmt.Printf("Reading packet using BPF: %s\n", ip_filter)
-
 	stats := newProbeStats(path, numPackets, interfaceDevice)
 
-	tc, err := beacon.NewTransportChannel(
-		beacon.WithBPFFilter(ip_filter),
+	tc, err := beacon.NewBoomerangTransportChannel(
+		path[0].To4() != nil,
 		beacon.WithInterface(interfaceDevice),
 		beacon.WithTimeout(100),
 	)
+
 	if err != nil {
 		return fmt.Errorf("Failed to create new TransportChannel: %s", err)
 	}
