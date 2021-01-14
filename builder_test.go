@@ -107,7 +107,7 @@ func TestIpv4UDPLayerIDField(t *testing.T) {
 
 	err := v4UDPLayer.SerializeTo(buf, opts)
 	if err != nil {
-		t.Errorf("Failed to serialize ipv4UDPLayer to bytes")
+		t.Errorf("Failed to serialize ipv4UDPLayer to bytes: %s", err)
 		t.FailNow()
 	}
 
