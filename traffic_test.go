@@ -7,9 +7,7 @@ import (
 )
 
 func BenchmarkBoomerang(b *testing.B) {
-	tc, err := NewTransportChannel(
-		WithBPFFilter("ip && ip[4:2]=0x6D"),
-	)
+	tc, err := NewBoomerangTransportChannel()
 	if err != nil {
 		b.Errorf("Failed to create a transport channel: %s", err)
 		b.FailNow()
