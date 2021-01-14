@@ -2,6 +2,7 @@ package beacon
 
 import (
 	"bytes"
+	"encoding/hex"
 	"net"
 	"testing"
 
@@ -93,5 +94,32 @@ func TestCreateRoundTripPacketForShortPath(t *testing.T) {
 	expectedErrMsg := "Path must have atleast 2 hops"
 	if err.Error() != expectedErrMsg {
 		t.Errorf("Expected error message: %s, got %s instead", expectedErrMsg, err.Error())
+	}
+}
+
+func TestIpv4UDPLayerIDField(t *testing.T) {
+	sourceIP := net.IP{0, 0, 0, 0}
+	destIP := net.IP{0, 0, 0, 0}
+
+	v4UDPLayer := buildIPv4UDPLayer(sourceIP, destIP, 0)
+	buf := gopacket.NewSerializeBuffer()
+	opts := gopacket.SerializeOptions{}
+
+	err := v4UDPLayer.SerializeTo(buf, opts)
+	if err != nil {
+		t.Errorf("Failed to serialize ipv4UDPLayer to bytes")
+		t.FailNow()
+	}
+
+	v4UDPLayerBytes := buf.Bytes()
+
+	// the identifier: 0x        6D
+	expectedIDField := []byte{0, 109}
+	// the BPF Filter syntax is ip[4:2] which is the same as slicing from [4:6]
+	// the 4+2 is added here to be explicit
+	actualIDField := v4UDPLayerBytes[4 : 4+2]
+
+	if !bytes.Equal(expectedIDField, actualIDField) {
+		t.Errorf("ID Field contents differed in value:\nwanted: %s\ngot:    %s", hex.Dump(expectedIDField), hex.Dump(actualIDField))
 	}
 }
