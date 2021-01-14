@@ -1,7 +1,6 @@
 package beacon
 
 import (
-	"encoding/json"
 	"sync"
 
 	"github.com/google/gopacket"
@@ -9,7 +8,7 @@ import (
 )
 
 // PacketFilter represents a criteria that a packet can be said to meet.
-type PacketFilter func(packet gopacket.Packet, payload *BoomerangPayload) bool
+type PacketFilter func(packet gopacket.Packet, id []byte) bool
 
 // Listener is represented by a uuid and a criteria.
 type Listener struct {
@@ -91,9 +90,9 @@ func (lm *ListenerMap) Delete(key uuid.UUID) {
 func (lm *ListenerMap) Run(p gopacket.Packet) {
 	listenersToDelete := make([]*Listener, 0)
 
-	unmarshalledPayload := &BoomerangPayload{}
+	var id []byte
 	if app := p.ApplicationLayer(); app != nil {
-		json.Unmarshal(app.Payload(), unmarshalledPayload)
+		id = app.Payload()[:16]
 	}
 
 	lm.Lock()
@@ -101,7 +100,7 @@ func (lm *ListenerMap) Run(p gopacket.Packet) {
 	for _, listener := range lm.m {
 		// packet meets criteria
 
-		if listener.Criteria(p, unmarshalledPayload) {
+		if listener.Criteria(p, id) {
 			listener.matchChan <- p
 			if !listener.persistent {
 				listenersToDelete = append(listenersToDelete, listener)
