@@ -125,8 +125,8 @@ func TestIpv4UDPLayerIDField(t *testing.T) {
 }
 
 func TestIpv6UDPLayerIDField(t *testing.T) {
-	sourceIP := net.IP{0, 0, 0, 0}
-	destIP := net.IP{0, 0, 0, 0}
+	sourceIP := net.IP{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+	destIP := net.IP{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 
 	v6UDPLayer := buildIPv6UDPLayer(sourceIP, destIP, 0)
 	buf := gopacket.NewSerializeBuffer()
@@ -134,7 +134,7 @@ func TestIpv6UDPLayerIDField(t *testing.T) {
 
 	err := v6UDPLayer.SerializeTo(buf, opts)
 	if err != nil {
-		t.Errorf("Failed to serialize ipv4UDPLayer to bytes")
+		t.Errorf("Failed to serialize ipv6UDPLayer to bytes: %s", err)
 		t.FailNow()
 	}
 
@@ -143,7 +143,7 @@ func TestIpv6UDPLayerIDField(t *testing.T) {
 	// the identifier: 0x        6D
 	expectedIDField := []byte{0, 109}
 	// the BPF Filter syntax is ip[2:2] which is the same as slicing from [2:4]
-	// the 4+2 is added here to be explicit
+	// the 2+2 is added here to be explicit
 	actualIDField := v6UDPLayerBytes[2 : 2+2]
 
 	if !bytes.Equal(expectedIDField, actualIDField) {
