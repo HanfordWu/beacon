@@ -1,7 +1,7 @@
 package beacon
 
 import (
-	"encoding/json"
+	"bytes"
 	"errors"
 	"fmt"
 	"net"
@@ -26,17 +26,9 @@ type BoomerangResult struct {
 // this struct is designed to be JSON unmarshalled from the IP payload in the boomerang packet
 type BoomerangPayload struct {
 	DestIP      net.IP
-	ID          string
+	ID          uuid.UUID
 	TxTimestamp time.Time
 	RxTimestamp time.Time
-}
-
-// NewBoomerangPayload constructs a BoomerangPayload struct
-func NewBoomerangPayload(destIP net.IP, id string) *BoomerangPayload {
-	return &BoomerangPayload{
-		DestIP: destIP,
-		ID:     id,
-	}
 }
 
 // BoomerangErrorType is an enum of possible errors encountered during a run of boomerang
@@ -163,18 +155,11 @@ func (tc *TransportChannel) Probe(path Path, numPackets int, timeout int) chan B
 func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 	resultChan := make(chan BoomerangResult)
 
-	destHop := path[len(path)-1]
-	id := uuid.New().String()
-	payload, err := json.Marshal(NewBoomerangPayload(destHop, id))
-	if err != nil {
-		return BoomerangResult{
-			Err:       err,
-			ErrorType: fatal,
-		}
-	}
+	id := uuid.New()
+	idBytes, _ := id.MarshalBinary() // no error is possible, this is just `return u[:], nil`
 
 	buf := gopacket.NewSerializeBuffer()
-	err = CreateRoundTripPacketForPath(path, payload, buf)
+	err := CreateRoundTripPacketForPath(path, idBytes, buf)
 	if err != nil {
 		return BoomerangResult{
 			Err:       err,
@@ -182,28 +167,28 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 		}
 	}
 
-	criteria := func(packet gopacket.Packet, payload *BoomerangPayload) bool {
+	criteria := func(packet gopacket.Packet, candidateID []byte) bool {
 		ipv4Layer := packet.Layer(layers.LayerTypeIPv4)
 		ip4, _ := ipv4Layer.(*layers.IPv4)
 		if ip4 == nil {
 			return false
 		}
 		if ip4.DstIP.Equal(path[0]) && ip4.SrcIP.Equal(path[1]) {
-			if payload.ID == id {
+			if bytes.Equal(idBytes, candidateID) {
 				return true
 			}
 		}
 		return false
 	}
 
-	criteriaV6 := func(packet gopacket.Packet, payload *BoomerangPayload) bool {
+	criteriaV6 := func(packet gopacket.Packet, candidateID []byte) bool {
 		ipv6Layer := packet.Layer(layers.LayerTypeIPv6)
 		ip6, _ := ipv6Layer.(*layers.IPv6)
 		if ip6 == nil {
 			return false
 		}
 		if ip6.DstIP.Equal(path[0]) && ip6.SrcIP.Equal(path[1]) {
-			if payload.ID == id {
+			if bytes.Equal(idBytes, candidateID) {
 				return true
 			}
 		}
@@ -242,20 +227,18 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 
 		select {
 		case matchedPacket := <-packetMatchChan:
-			// extract the udp layer from the matched packet
-			udpLayer := matchedPacket.Layer(layers.LayerTypeUDP)
-			udp, _ := udpLayer.(*layers.UDP)
-
-			// unmarshall the payload into an empty BoomerangPayload struct
-			unmarshalledPayload := &BoomerangPayload{}
-			json.Unmarshal(udp.Payload, unmarshalledPayload) // TODO: use a more efficient deserialization
-
 			// extract the rx timestamp from the packet metadta
 			packetMetadata := matchedPacket.Metadata()
-			unmarshalledPayload.RxTimestamp = packetMetadata.CaptureInfo.Timestamp
+
+			payload := BoomerangPayload{
+				ID:          id,
+				DestIP:      path[len(path)-1],
+				TxTimestamp: txTimestamp,
+				RxTimestamp: packetMetadata.CaptureInfo.Timestamp,
+			}
 
 			result := BoomerangResult{
-				Payload: *unmarshalledPayload,
+				Payload: payload,
 			}
 
 			result.Payload.TxTimestamp = txTimestamp
@@ -264,6 +247,7 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 			tc.UnregisterListener(listener)
 			resultChan <- BoomerangResult{
 				Payload: BoomerangPayload{
+					ID:          id,
 					DestIP:      path[len(path)-1],
 					TxTimestamp: txTimestamp,
 					RxTimestamp: time.Now().UTC(),

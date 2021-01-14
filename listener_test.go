@@ -1,7 +1,7 @@
 package beacon
 
 import (
-	"encoding/json"
+	"bytes"
 	"net"
 	"testing"
 	"time"
@@ -13,7 +13,7 @@ import (
 
 func TestStore(t *testing.T) {
 	lm := NewListenerMap()
-	l := NewListener(func(p gopacket.Packet, payload *BoomerangPayload) bool {
+	l := NewListener(func(p gopacket.Packet, id []byte) bool {
 		return true
 	})
 
@@ -32,7 +32,7 @@ func TestStore(t *testing.T) {
 
 func TestLoad(t *testing.T) {
 	lm := NewListenerMap()
-	l := NewListener(func(p gopacket.Packet, payload *BoomerangPayload) bool {
+	l := NewListener(func(p gopacket.Packet, id []byte) bool {
 		return true
 	})
 
@@ -46,7 +46,7 @@ func TestLoad(t *testing.T) {
 
 func TestNonExistentLoad(t *testing.T) {
 	lm := NewListenerMap()
-	l := NewListener(func(p gopacket.Packet, payload *BoomerangPayload) bool {
+	l := NewListener(func(p gopacket.Packet, id []byte) bool {
 		return true
 	})
 
@@ -58,7 +58,7 @@ func TestNonExistentLoad(t *testing.T) {
 
 func TestStoreAndDelete(t *testing.T) {
 	lm := NewListenerMap()
-	l := NewListener(func(p gopacket.Packet, payload *BoomerangPayload) bool {
+	l := NewListener(func(p gopacket.Packet, id []byte) bool {
 		return true
 	})
 
@@ -79,26 +79,40 @@ func TestNonExistentDelete(t *testing.T) {
 
 func TestRunMatch(t *testing.T) {
 	lm := NewListenerMap()
-	l := NewListener(func(p gopacket.Packet, payload *BoomerangPayload) bool {
-		if payload.ID == "test ID" {
+
+	desiredBytes := []byte{156,
+		40,
+		214,
+		79,
+		19,
+		48,
+		68,
+		114,
+		131,
+		52,
+		211,
+		254,
+		63,
+		212,
+		217,
+		42,
+	}
+
+	l := NewListener(func(p gopacket.Packet, id []byte) bool {
+		if bytes.Equal(id, desiredBytes) {
 			return true
 		}
 		return false
 	})
+
 	lm.Store(l.id, l)
 
-	payloadBytes, err := json.Marshal(NewBoomerangPayload(net.IP{0, 0, 0, 0}, "test ID"))
-	if err != nil {
-		t.Errorf("Failed to create a payload for the test: %s", err)
-		t.FailNow()
-	}
-
 	buf := gopacket.NewSerializeBuffer()
-	err = BuildICMPTraceroutePacket(
+	err := BuildICMPTraceroutePacket(
 		net.IP{0, 0, 0, 0},
 		net.IP{0, 0, 0, 0},
 		64,
-		payloadBytes,
+		desiredBytes,
 		buf,
 		0,
 		96,
@@ -122,26 +136,42 @@ func TestRunMatch(t *testing.T) {
 
 func TestRunNoMatch(t *testing.T) {
 	lm := NewListenerMap()
-	l := NewListener(func(p gopacket.Packet, payload *BoomerangPayload) bool {
-		if payload.ID == "test ID" {
+	desiredBytes := []byte{156,
+		40,
+		214,
+		79,
+		19,
+		48,
+		68,
+		114,
+		131,
+		52,
+		211,
+		254,
+		63,
+		212,
+		217,
+		42,
+	}
+	l := NewListener(func(p gopacket.Packet, id []byte) bool {
+		if bytes.Equal(id, desiredBytes) {
 			return true
 		}
 		return false
 	})
 	lm.Store(l.id, l)
 
-	payloadBytes, err := json.Marshal(NewBoomerangPayload(net.IP{0, 0, 0, 0}, "non-matching ID"))
-	if err != nil {
-		t.Errorf("Failed to create a payload for the test: %s", err)
-		t.FailNow()
+	nonMatchingBytes := make([]byte, 16)
+	for i := 0; i < 16; i++ {
+		nonMatchingBytes[i] = 0
 	}
 
 	buf := gopacket.NewSerializeBuffer()
-	err = BuildICMPTraceroutePacket(
+	err := BuildICMPTraceroutePacket(
 		net.IP{0, 0, 0, 0},
 		net.IP{0, 0, 0, 0},
 		64,
-		payloadBytes,
+		nonMatchingBytes,
 		buf,
 		0,
 		96,
@@ -167,9 +197,26 @@ func TestListenerCount(t *testing.T) {
 	tc := TransportChannel{
 		listenerMap: NewListenerMap(),
 	}
+	desiredBytes := []byte{156,
+		40,
+		214,
+		79,
+		19,
+		48,
+		68,
+		114,
+		131,
+		52,
+		211,
+		254,
+		63,
+		212,
+		217,
+		42,
+	}
 
-	l := NewListener(func(p gopacket.Packet, payload *BoomerangPayload) bool {
-		if payload.ID == "test ID" {
+	l := NewListener(func(p gopacket.Packet, id []byte) bool {
+		if bytes.Equal(id, desiredBytes) {
 			return true
 		}
 		return false
