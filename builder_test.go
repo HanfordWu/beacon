@@ -107,7 +107,7 @@ func TestIpv4UDPLayerIDField(t *testing.T) {
 
 	err := v4UDPLayer.SerializeTo(buf, opts)
 	if err != nil {
-		t.Errorf("Failed to serialize ipv4UDPLayer to bytes")
+		t.Errorf("Failed to serialize ipv4UDPLayer to bytes: %s", err)
 		t.FailNow()
 	}
 
@@ -118,6 +118,33 @@ func TestIpv4UDPLayerIDField(t *testing.T) {
 	// the BPF Filter syntax is ip[4:2] which is the same as slicing from [4:6]
 	// the 4+2 is added here to be explicit
 	actualIDField := v4UDPLayerBytes[4 : 4+2]
+
+	if !bytes.Equal(expectedIDField, actualIDField) {
+		t.Errorf("ID Field contents differed in value:\nwanted: %s\ngot:    %s", hex.Dump(expectedIDField), hex.Dump(actualIDField))
+	}
+}
+
+func TestIpv6UDPLayerIDField(t *testing.T) {
+	sourceIP := net.IP{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+	destIP := net.IP{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+
+	v6UDPLayer := buildIPv6UDPLayer(sourceIP, destIP, 0)
+	buf := gopacket.NewSerializeBuffer()
+	opts := gopacket.SerializeOptions{}
+
+	err := v6UDPLayer.SerializeTo(buf, opts)
+	if err != nil {
+		t.Errorf("Failed to serialize ipv6UDPLayer to bytes: %s", err)
+		t.FailNow()
+	}
+
+	v6UDPLayerBytes := buf.Bytes()
+
+	// the identifier: 0x        6D
+	expectedIDField := []byte{0, 109}
+	// the BPF Filter syntax is ip[2:2] which is the same as slicing from [2:4]
+	// the 2+2 is added here to be explicit
+	actualIDField := v6UDPLayerBytes[2 : 2+2]
 
 	if !bytes.Equal(expectedIDField, actualIDField) {
 		t.Errorf("ID Field contents differed in value:\nwanted: %s\ngot:    %s", hex.Dump(expectedIDField), hex.Dump(actualIDField))

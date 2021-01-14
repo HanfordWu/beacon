@@ -84,7 +84,7 @@ func UseListeners(useListeners bool) TransportChannelOption {
 	}
 }
 
-// NewTransportChannel instantiates a new transport chanel
+// NewTransportChannel instantiates a new transport channel
 func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, error) {
 	rand.Seed(time.Now().UnixNano())
 
@@ -162,6 +162,12 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 	}
 
 	return tc, nil
+}
+
+// NewBoomerangTransportChannel instantiates a new transport channel with an ip packet header (id:109) for the bpf
+func NewBoomerangTransportChannel(options ...TransportChannelOption) (*TransportChannel, error) {
+	options = append(options, WithBPFFilter("(ip && ip[4:2]=0x6D) || (ip6 && ip6[2:2] = 0x6D)"))
+	return NewTransportChannel(options...)
 }
 
 func (tc *TransportChannel) renewSocketFD() error {

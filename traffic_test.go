@@ -7,9 +7,7 @@ import (
 )
 
 func BenchmarkBoomerang(b *testing.B) {
-	tc, err := NewTransportChannel(
-		WithBPFFilter("ip && ip[4:2]=0x6D"),
-	)
+	tc, err := NewBoomerangTransportChannel()
 	if err != nil {
 		b.Errorf("Failed to create a transport channel: %s", err)
 		b.FailNow()
@@ -34,7 +32,43 @@ func BenchmarkBoomerang(b *testing.B) {
 		for _, path := range testPaths {
 			go func(p Path) {
 				defer wg.Done()
-				result := tc.Boomerang(path, timeout)
+				result := tc.Boomerang(p, timeout)
+				if result.Err != nil {
+					b.Errorf("Boomerang call returned an error: %s", result.Err)
+				}
+			}(path)
+		}
+		wg.Wait()
+	}
+}
+
+func BenchmarkBoomerangIPV6(b *testing.B) {
+	tc, err := NewBoomerangTransportChannel()
+	if err != nil {
+		b.Errorf("Failed to create a transport channel: %s", err)
+		b.FailNow()
+	}
+
+	testSize := 1000
+	testPaths := make([]Path, testSize)
+
+	for i := 0; i < testSize; i++ {
+		testPaths[i] = Path{
+			// hardcoded to work in a specific crystalnet env
+			// might be useful to generalize this in some way
+			net.ParseIP("2a01:111:2000:6::10a"),
+			net.ParseIP("2a01:111:2000::2:f000:e"),
+		}
+	}
+
+	timeout := 1
+	for n := 0; n < b.N; n++ {
+		var wg sync.WaitGroup
+		wg.Add(testSize)
+		for _, path := range testPaths {
+			go func(p Path) {
+				defer wg.Done()
+				result := tc.Boomerang(p, timeout)
 				if result.Err != nil {
 					b.Errorf("Boomerang call returned an error: %s", result.Err)
 				}
