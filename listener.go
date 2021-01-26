@@ -90,10 +90,13 @@ func (lm *ListenerMap) Delete(key uuid.UUID) {
 func (lm *ListenerMap) Run(p gopacket.Packet) {
 	listenersToDelete := make([]*Listener, 0)
 
-	var id []byte
-	if app := p.ApplicationLayer(); app != nil {
-		id = app.Payload()[:16]
+	app := p.ApplicationLayer()
+	if app == nil || len(app.Payload()) < 16 {
+		// packet doesn't have an application layer or payload < 16 bytes
+		return
 	}
+
+	id := app.Payload()[:16]
 
 	lm.Lock()
 
