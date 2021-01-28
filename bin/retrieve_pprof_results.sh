@@ -2,7 +2,7 @@
 
 scp -r crystalnet@mel20-0100-0002-01sw:/home/crystalnet/moby-bench-results .
 
-ssh mel20-0100-0002-01sw << EOF
+ssh crystalnet@mel20-0100-0002-01sw << EOF
   bash rm -r /home/crystalnet/moby-bench-results
 EOF
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # make the benchmark results directory beforehand so it's not owned by root
-ssh mel20-0100-0002-01sw << EOF
+ssh crystalnet@mel20-0100-0002-01sw << EOF
   mkdir /home/crystalnet/moby-bench-results
 EOF
 
