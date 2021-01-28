@@ -349,21 +349,6 @@ func (tc *TransportChannel) Version() string {
 }
 
 // FindSourceIPForDest finds the IP of the interface device of the TransportChannel instance
-//TODO: Test router solution in prod canary docker container
 func (tc *TransportChannel) FindSourceIPForDest(dest net.IP) (net.IP, error) {
-	//router, err := routing.New()
-	//_, _, sourceIP, err := router.Route(dest)
-	//if err != nil {
-	//	return nil, err
-	//}
-
-	conn, err := net.Dial("udp", fmt.Sprintf("[%s]:80", dest))
-	if err != nil {
-		return nil, fmt.Errorf("Failed to dial dest ip %s: %s", dest, err)
-	}
-	defer conn.Close()
-
-	sourceIP := conn.LocalAddr().(*net.UDPAddr).IP
-
-	return sourceIP, nil
+	return FindSourceIPForDest(dest)
 }

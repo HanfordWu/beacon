@@ -13,15 +13,24 @@ func BenchmarkBoomerang(b *testing.B) {
 		b.FailNow()
 	}
 
+	// hardcoded to work in a specific crystalnet env
+	// might be useful to generalize this in some way
+	destIP := net.IP{207, 46, 33, 175}
+	srcIP, err := tc.FindSourceIPForDest(destIP)
+	if err != nil {
+		b.Errorf("Failed to find a sourceIP for %s: %s", destIP, err)
+		b.FailNow()
+	}
+
+	b.Logf("Found srcIP: %s", srcIP)
+
 	testSize := 1000
 	testPaths := make([]Path, testSize)
 
 	for i := 0; i < testSize; i++ {
 		testPaths[i] = Path{
-			// hardcoded to work in a specific crystalnet env
-			// might be useful to generalize this in some way
-			net.IP{13, 106, 238, 13},
-			net.IP{207, 46, 33, 175},
+			srcIP,
+			destIP,
 		}
 	}
 
@@ -75,5 +84,23 @@ func BenchmarkBoomerangIPV6(b *testing.B) {
 			}(path)
 		}
 		wg.Wait()
+	}
+}
+
+func BenchmarkFindSourceIPForDest(b *testing.B) {
+	tc, err := NewBoomerangTransportChannel()
+	if err != nil {
+		b.Errorf("Failed to create a transport channel: %s", err)
+		b.FailNow()
+	}
+
+	destIP := net.IP{207, 46, 33, 175}
+
+	for n := 0; n < b.N; n++ {
+		_, err := tc.FindSourceIPForDest(destIP)
+		if err != nil {
+			b.Errorf("Failed to find a srcIP for %s: %s", destIP, err)
+			b.FailNow()
+		}
 	}
 }

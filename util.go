@@ -56,6 +56,20 @@ func GetInterfaceDeviceFromDestIP(destIP net.IP) (string, error) {
 	return iface.Name, nil
 }
 
+// FindSourceIPForDest performs a udp dial and inspects the resulting connection
+// to extract the preferred source IP to use for the given dest IP
+func FindSourceIPForDest(dest net.IP) (net.IP, error) {
+	conn, err := net.Dial("udp", fmt.Sprintf("[%s]:80", dest))
+	if err != nil {
+		return nil, fmt.Errorf("Failed to dial dest ip %s: %s", dest, err)
+	}
+	defer conn.Close()
+
+	sourceIP := conn.LocalAddr().(*net.UDPAddr).IP
+
+	return sourceIP, nil
+}
+
 func Merge(resultChannels ...chan BoomerangResult) <-chan BoomerangResult {
 	var wg sync.WaitGroup
 	resultChannel := make(chan BoomerangResult)
