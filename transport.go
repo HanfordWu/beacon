@@ -347,8 +347,3 @@ func (tc *TransportChannel) Filter() string {
 func (tc *TransportChannel) Version() string {
 	return pcap.Version()
 }
-
-// FindSourceIPForDest finds the IP of the interface device of the TransportChannel instance
-func (tc *TransportChannel) FindSourceIPForDest(dest net.IP) (net.IP, error) {
-	return FindSourceIPForDest(dest)
-}
