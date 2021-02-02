@@ -59,12 +59,21 @@ func BenchmarkBoomerangIPV6(b *testing.B) {
 	testSize := 1000
 	testPaths := make([]Path, testSize)
 
+	destIP := net.ParseIP("2a01:111:2000::2:f000:e")
+	sourceIP, err := FindSourceIPForDest(destIP)
+	if err != nil {
+		b.Errorf("Failed to find source IP for dest %s: %s", destIP, err)
+		b.FailNow()
+	}
+
 	for i := 0; i < testSize; i++ {
 		testPaths[i] = Path{
 			// hardcoded to work in a specific crystalnet env
 			// might be useful to generalize this in some way
-			net.ParseIP("2a01:111:2000:6::10a"),
-			net.ParseIP("2a01:111:2000::2:f000:e"),
+			// net.ParseIP("2a01:111:2000:6::10a"),
+			// net.ParseIP("2a01:111:2000::2:f000:e"),
+			sourceIP,
+			destIP,
 		}
 	}
 
