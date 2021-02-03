@@ -140,7 +140,7 @@ func findPathFromSourceToDest() (beacon.Path, error) {
 
 	if source == "" {
 		// if no source was provided via cli flag, use best source for dest
-		srcIP, err = pathFinderTC.FindSourceIPForDest(destIP)
+		srcIP, err = beacon.FindSourceIPForDest(destIP)
 		if err != nil {
 			return nil, err
 		}
