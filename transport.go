@@ -348,6 +348,6 @@ func (tc *TransportChannel) Version() string {
 	return pcap.Version()
 }
 
-func (tc *TransportChannel) GetFilter() (string) {
+func (tc *TransportChannel) GetFilter() string {
 	return tc.filter
 }
