@@ -140,7 +140,7 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 
 	var finalSourceIP net.IP
 	if sourceIP == nil {
-		foundSourceIP, err := tc.FindSourceIPForDest(destIP)
+		foundSourceIP, err := FindSourceIPForDest(destIP)
 		if err != nil {
 			return pathChan, err
 		}

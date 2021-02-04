@@ -64,7 +64,7 @@ func (tc *TransportChannel) DiscoverAndProbe(src, dst net.IP, numPackets, timeou
 
 	tracerouteTC.Close()
 
-	srcIP, err := tracerouteTC.FindSourceIPForDest(dst)
+	srcIP, err := FindSourceIPForDest(dst)
 	if err != nil {
 		return nil, err
 	}
