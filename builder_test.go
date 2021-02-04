@@ -141,7 +141,7 @@ func TestIpv6UDPLayerIDField(t *testing.T) {
 	v6UDPLayerBytes := buf.Bytes()
 
 	// the identifier: 0x        6D
-	expectedIDField := []byte{0, 109}
+	expectedIDField := []byte{0, 0}
 	// the BPF Filter syntax is ip[2:2] which is the same as slicing from [2:4]
 	// the 2+2 is added here to be explicit
 	actualIDField := v6UDPLayerBytes[2 : 2+2]
