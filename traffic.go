@@ -79,7 +79,7 @@ func (tc *TransportChannel) DiscoverAndProbe(src, dst net.IP, numPackets, timeou
 // ProbeEachHopOfPath probes each hop in a path, but accepts a transport channel as an argument.  This allows the caller to share
 // one transport channel between many calls to Probe.  The supplied tranport channel must have a BPFFilter of "ip proto 4"
 func (tc *TransportChannel) ProbeEachHopOfPath(path Path, numPackets int, timeout int) <-chan BoomerangResult {
-	if !strings.Contains(tc.filter, "ip") && !strings.Contains(tc.filter, "udp") {
+	if !strings.Contains(tc.filter, "ip") && !strings.Contains(tc.filter, "ip6") {
 		resultChan := make(chan BoomerangResult)
 
 		go func() {
@@ -101,7 +101,7 @@ func (tc *TransportChannel) ProbeEachHopOfPath(path Path, numPackets int, timeou
 // ProbeEachHopOfPathSync synchronously probes each hop in a path.  That is, it waits for each round of packets to come
 // back from each hop before sending the next round
 func (tc *TransportChannel) ProbeEachHopOfPathSync(path Path, numPackets int, timeout int) <-chan BoomerangResult {
-	if !strings.Contains(tc.filter, "ip") && !strings.Contains(tc.filter, "udp") {
+	if !strings.Contains(tc.filter, "ip") && !strings.Contains(tc.filter, "ip6") {
 		resultChan := make(chan BoomerangResult)
 
 		go func() {
