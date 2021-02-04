@@ -80,7 +80,11 @@ func TestNonExistentDelete(t *testing.T) {
 func TestRunMatch(t *testing.T) {
 	lm := NewListenerMap()
 
-	desiredBytes := []byte{156,
+	desiredBytes := []byte{109,
+		111,
+		98,
+		121,
+		156,
 		40,
 		214,
 		79,
@@ -136,7 +140,11 @@ func TestRunMatch(t *testing.T) {
 
 func TestRunNoMatch(t *testing.T) {
 	lm := NewListenerMap()
-	desiredBytes := []byte{156,
+	desiredBytes := []byte{109,
+		111,
+		98,
+		121,
+		156,
 		40,
 		214,
 		79,
@@ -161,7 +169,7 @@ func TestRunNoMatch(t *testing.T) {
 	})
 	lm.Store(l.id, l)
 
-	nonMatchingBytes := make([]byte, 16)
+	nonMatchingBytes := make([]byte, 20)
 	for i := 0; i < 16; i++ {
 		nonMatchingBytes[i] = 0
 	}

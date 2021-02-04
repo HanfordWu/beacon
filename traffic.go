@@ -156,7 +156,9 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 	resultChan := make(chan BoomerangResult)
 
 	id := uuid.New()
-	idBytes, _ := id.MarshalBinary() // no error is possible, this is just `return u[:], nil`
+	tagString := []byte("moby")
+	idMarshalled, _ := id.MarshalBinary() // no error is possible, this is just `return u[:], nil`
+	idBytes := append(tagString, idMarshalled...)
 
 	buf := gopacket.NewSerializeBuffer()
 	err := CreateRoundTripPacketForPath(path, idBytes, buf)
