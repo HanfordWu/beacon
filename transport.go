@@ -44,7 +44,6 @@ type TransportChannelOption func(*TransportChannel)
 
 // WithBPFFilter constructs an option to set BPFFilter via the TransportChannel constructor
 func WithBPFFilter(filter string) TransportChannelOption {
-	log.Printf("filtering packets using bpf filter: %s\n", filter)
 	return func(tc *TransportChannel) {
 		tc.filter = filter
 	}
