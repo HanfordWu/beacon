@@ -96,7 +96,7 @@ func (lm *ListenerMap) Run(p gopacket.Packet) {
 		return
 	}
 
-	id := app.Payload()[:16]
+	id := app.Payload()[:20]
 
 	lm.Lock()
 

@@ -86,7 +86,7 @@ func buildIPv6UDPLayer(sourceIP, destIP net.IP, hopLimit uint8) *layers.IPv6 {
 		SrcIP:      sourceIP,
 		DstIP:      destIP,
 		NextHeader: layers.IPProtocolUDP,
-		FlowLabel:  109,
+		//FlowLabel:  109,
 	}
 
 	return ipV6Layer

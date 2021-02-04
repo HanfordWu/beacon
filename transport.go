@@ -44,6 +44,7 @@ type TransportChannelOption func(*TransportChannel)
 
 // WithBPFFilter constructs an option to set BPFFilter via the TransportChannel constructor
 func WithBPFFilter(filter string) TransportChannelOption {
+	log.Printf("filtering packets using bpf filter: %s\n", filter)
 	return func(tc *TransportChannel) {
 		tc.filter = filter
 	}
@@ -166,7 +167,7 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 
 // NewBoomerangTransportChannel instantiates a new transport channel with an ip packet header (id:109) for the bpf
 func NewBoomerangTransportChannel(options ...TransportChannelOption) (*TransportChannel, error) {
-	options = append(options, WithBPFFilter("(ip && ip[4:2]=0x6D) || (ip6 && ip6[2:2] = 0x6D)"))
+	options = append(options, WithBPFFilter("ip[4:2] = 0x6d || ip6[48:4] = 0x6d6f6279"))
 	return NewTransportChannel(options...)
 }
 
