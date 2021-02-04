@@ -82,7 +82,7 @@ func probeRun(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("Failed to create new TransportChannel: %s", err)
 	}
-	log.Printf("filtering packets using bpf filter: %s\n", tc.filter)
+	fmt.Printf("filtering packets using bpf filter: %s\n", tc.GetFilter())
 
 	handleResult := func(result beacon.BoomerangResult) error {
 		if result.Err != nil {

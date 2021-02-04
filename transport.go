@@ -367,3 +367,7 @@ func (tc *TransportChannel) FindSourceIPForDest(dest net.IP) (net.IP, error) {
 
 	return sourceIP, nil
 }
+
+func (tc *TransportChannel) GetFilter() (string) {
+	return tc.filter
+}
