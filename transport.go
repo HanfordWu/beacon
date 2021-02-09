@@ -20,6 +20,7 @@ import (
 type TransportChannel struct {
 	handle                 *pcap.Handle
 	packetSource           *gopacket.PacketSource
+	packetHashes           *packetHashMap
 	listenerMap            *ListenerMap
 	portLock               sync.Mutex
 	packets                chan gopacket.Packet
@@ -97,6 +98,7 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 		srcPortOffset: rand.Intn(maxPortOffset),
 		dstPortOffset: rand.Intn(maxPortOffset),
 		listenerMap:   NewListenerMap(),
+		packetHashes:  NewPacketHashMap(),
 		useListeners:  true,
 	}
 
@@ -156,6 +158,7 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 		// activate listeners
 		go func() {
 			for packet := range tc.rx() {
+				go tc.packetHashes.run(packet)
 				go tc.listenerMap.Run(packet)
 			}
 		}()
