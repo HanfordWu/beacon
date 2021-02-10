@@ -1,7 +1,6 @@
 package beacon
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"net"
@@ -10,7 +9,6 @@ import (
 	"time"
 
 	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
 	"github.com/google/uuid"
 )
 
@@ -159,6 +157,7 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 	tagString := []byte("moby")
 	idMarshalled, _ := id.MarshalBinary() // no error is possible, this is just `return u[:], nil`
 	idBytes := append(tagString, idMarshalled...)
+	idHash := string(idBytes)
 
 	buf := gopacket.NewSerializeBuffer()
 	err := CreateRoundTripPacketForPath(path, idBytes, buf)
@@ -169,41 +168,7 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 		}
 	}
 
-	criteria := func(packet gopacket.Packet, candidateID []byte) bool {
-		ipv4Layer := packet.Layer(layers.LayerTypeIPv4)
-		ip4, _ := ipv4Layer.(*layers.IPv4)
-		if ip4 == nil {
-			return false
-		}
-		if ip4.DstIP.Equal(path[0]) && ip4.SrcIP.Equal(path[1]) {
-			if bytes.Equal(idBytes, candidateID) {
-				return true
-			}
-		}
-		return false
-	}
-
-	criteriaV6 := func(packet gopacket.Packet, candidateID []byte) bool {
-		ipv6Layer := packet.Layer(layers.LayerTypeIPv6)
-		ip6, _ := ipv6Layer.(*layers.IPv6)
-		if ip6 == nil {
-			return false
-		}
-		if ip6.DstIP.Equal(path[0]) && ip6.SrcIP.Equal(path[1]) {
-			if bytes.Equal(idBytes, candidateID) {
-				return true
-			}
-		}
-		return false
-	}
-
-	var listener *Listener
-	if path[0].To4() != nil {
-		listener = NewListener(criteria)
-	} else {
-		listener = NewListener(criteriaV6)
-	}
-	packetMatchChan := tc.RegisterListener(listener)
+	packetMatchChan := tc.RegisterHash(idHash)
 
 	go func() {
 		timeOutDuration := time.Duration(timeout) * time.Second
@@ -214,7 +179,7 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 		err := tc.SendToPath(packetData, path)
 		if err != nil {
 			fmt.Printf("error in SendToPath: %s\n", err)
-			tc.UnregisterListener(listener)
+			tc.UnregisterHash(idHash)
 
 			resultChan <- BoomerangResult{
 				Err:       err,
@@ -246,7 +211,7 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 			result.Payload.TxTimestamp = txTimestamp
 			resultChan <- result
 		case <-timer.C:
-			tc.UnregisterListener(listener)
+			tc.UnregisterHash(idHash)
 			resultChan <- BoomerangResult{
 				Payload: BoomerangPayload{
 					ID:          id,

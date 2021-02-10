@@ -10,8 +10,12 @@ import (
 // PacketHasher produces some hash for a given packet which uniquely identifies a packet.
 type PacketHasher func(gopacket.Packet) (string, error)
 
-func (tc *TransportChannel) AttachPacketHasher(ph PacketHasher) {
-	tc.packetHashers = append(tc.packetHashers, ph)
+// AttachHasher attaches a packet hasher to the current transport channel.
+// When a packet is receieved by the transport channel, its hash will be computed
+// by the each of the attached Hashers, and if the resulting hash identifies a packet
+// being listened for, it will be sent over the returned channel.
+func (tc *TransportChannel) AttachHasher(hasher PacketHasher) {
+	tc.packetHashes.hashers = append(tc.packetHashes.hashers, hasher)
 }
 
 func BoomerangPacketHasher(p gopacket.Packet) (string, error) {
@@ -33,12 +37,9 @@ func (tc *TransportChannel) RegisterHash(hash string) chan gopacket.Packet {
 	return tc.packetHashes.store(hash)
 }
 
-// AttachHasher attaches a packet hasher to the current transport channel.
-// When a packet is receieved by the transport channel, its hash will be computed
-// by the each of the attached Hashers, and if the resulting hash identifies a packet
-// being listened for, it will be sent over the returned channel.
-func (tc *TransportChannel) AttachHasher(hasher PacketHasher) {
-	tc.packetHashes.hashers = append(tc.packetHashes.hashers, hasher)
+// UnregisterHash removes the given hash from the packetHashes map.
+func (tc *TransportChannel) UnregisterHash(hash string) bool {
+	return tc.packetHashes.del(hash)
 }
 
 type packetHashMap struct {
@@ -75,4 +76,18 @@ func (phm *packetHashMap) store(hash string) chan gopacket.Packet {
 	phm.m[hash] = packetMatchChannel
 
 	return packetMatchChannel
+}
+
+func (phm *packetHashMap) del(hash string) bool {
+	phm.Lock()
+	defer phm.Unlock()
+
+	packetMatchChannel, exists := phm.m[hash]
+
+	if exists {
+		close(packetMatchChannel)
+		delete(phm.m, hash)
+	}
+
+	return exists
 }

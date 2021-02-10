@@ -155,6 +155,8 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 	go tc.renewSocket6FD()
 
 	if tc.useListeners {
+		tc.AttachHasher(BoomerangPacketHasher)
+
 		// activate listeners
 		go func() {
 			for packet := range tc.rx() {
