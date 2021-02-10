@@ -56,12 +56,20 @@ func NewPacketHashMap() *packetHashMap {
 }
 
 func (phm *packetHashMap) run(p gopacket.Packet) {
+	computedHashSlice := []string{}
+
 	for _, hasher := range phm.hashers {
 		computedHash, err := hasher(p)
 		if err != nil {
 			continue
 		}
 
+		computedHashSlice = append(computedHashSlice, computedHash)
+	}
+
+	phm.Lock()
+	defer phm.Unlock()
+	for _, computedHash := range computedHashSlice {
 		if packetMatchChannel, ok := phm.m[computedHash]; ok {
 			packetMatchChannel <- p
 		}
