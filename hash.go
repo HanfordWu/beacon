@@ -3,6 +3,8 @@ package beacon
 import (
 	"fmt"
 	"sync"
+	"runtime"
+	"reflect"
 
 	"github.com/google/gopacket"
 )
@@ -14,8 +16,16 @@ type PacketHasher func(gopacket.Packet) (string, error)
 // When a packet is receieved by the transport channel, its hash will be computed
 // by the each of the attached Hashers, and if the resulting hash identifies a packet
 // being listened for, it will be sent over the returned channel.
-func (tc *TransportChannel) AttachHasher(hasher PacketHasher) {
+func (tc *TransportChannel) AttachHasher(hasher PacketHasher) error {
+	hasherName := runtime.FuncForPC(reflect.ValueOf(hasher).Pointer()).Name()
+	for _, fn := range tc.packetHashes.hashers {
+		fnName := runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name()
+		if fnName == hasherName {
+			return fmt.Errorf("Adding hasher that already exists in packetHashMap. Failing for efficiency.")
+		}
+	}
 	tc.packetHashes.hashers = append(tc.packetHashes.hashers, hasher)
+	return nil
 }
 
 func BoomerangPacketHasher(p gopacket.Packet) (string, error) {
@@ -43,15 +53,13 @@ func (tc *TransportChannel) UnregisterHash(hash string) bool {
 }
 
 type packetHashMap struct {
-	sync.Mutex
-
-	m       map[string]chan gopacket.Packet
+	m       sync.Map
 	hashers []PacketHasher
 }
 
 func NewPacketHashMap() *packetHashMap {
 	return &packetHashMap{
-		m: make(map[string]chan gopacket.Packet),
+		m: sync.Map{},
 	}
 }
 
@@ -67,34 +75,30 @@ func (phm *packetHashMap) run(p gopacket.Packet) {
 		computedHashSlice = append(computedHashSlice, computedHash)
 	}
 
-	phm.Lock()
-	defer phm.Unlock()
 	for _, computedHash := range computedHashSlice {
-		if packetMatchChannel, ok := phm.m[computedHash]; ok {
-			packetMatchChannel <- p
+		if packetMatchChannel, ok := phm.m.Load(computedHash); ok {
+			assertedChannel := packetMatchChannel.(chan gopacket.Packet)
+			assertedChannel <- p
 		}
 	}
 }
 
 func (phm *packetHashMap) store(hash string) chan gopacket.Packet {
-	phm.Lock()
-	defer phm.Unlock()
 
 	packetMatchChannel := make(chan gopacket.Packet, 1)
-	phm.m[hash] = packetMatchChannel
+	phm.m.Store(hash, packetMatchChannel)
 
 	return packetMatchChannel
 }
 
 func (phm *packetHashMap) del(hash string) bool {
-	phm.Lock()
-	defer phm.Unlock()
 
-	packetMatchChannel, exists := phm.m[hash]
+	packetMatchChannel, exists := phm.m.Load(hash)
+	assertedChannel := packetMatchChannel.(chan gopacket.Packet)
 
 	if exists {
-		close(packetMatchChannel)
-		delete(phm.m, hash)
+		close(assertedChannel)
+		phm.m.Delete(hash)
 	}
 
 	return exists
