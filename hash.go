@@ -7,6 +7,7 @@ import (
 	"reflect"
 
 	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 )
 
 // PacketHasher produces some hash for a given packet which uniquely identifies a packet.
@@ -39,12 +40,38 @@ func BoomerangPacketHasher(p gopacket.Packet) (string, error) {
 	return string(payloadBytes), nil
 }
 
+func V6TraceRouteHasher(packet gopacket.Packet) (string, error) {
+	appLayer := packet.ApplicationLayer()
+	icmpPayload := appLayer.Payload()
+	layerType := layers.LayerTypeIPv6
+	icmpPayload = icmpPayload[4:]
+	decodedPayloadPacket := gopacket.NewPacket(icmpPayload, layerType, gopacket.Default)
+	udpLayer := decodedPayloadPacket.Layer(layers.LayerTypeUDP)
+	if udpLayer == nil {
+		return "", fmt.Errorf("Could not find udp layer in incoming traceroute packet.")
+	}
+	return string(udpLayer.(*layers.UDP).BaseLayer.Contents), nil
+}
+
+func V4TraceRouteHasher(packet gopacket.Packet) (string, error) {
+appLayer := packet.ApplicationLayer()
+        icmpPayload := appLayer.Payload()
+        layerType := layers.LayerTypeIPv4
+        decodedPayloadPacket := gopacket.NewPacket(icmpPayload, layerType, gopacket.Default)
+        udpLayer := decodedPayloadPacket.Layer(layers.LayerTypeUDP)
+        if udpLayer == nil {
+                return "", fmt.Errorf("Could not find udp layer in incoming traceroute packet.")
+        }
+        return string(udpLayer.(*layers.UDP).BaseLayer.Contents), nil
+}
+
+
 // RegisterHash registers a hash to the current transport channel.
 // When a packet is receieved by the transport channel, its hash will be computed
 // by the each of the attached Hashers, and if the resulting hash identifies a packet
 // being listened for, it will be sent over the returned channel.
-func (tc *TransportChannel) RegisterHash(hash string) chan gopacket.Packet {
-	return tc.packetHashes.store(hash)
+func (tc *TransportChannel) RegisterHash(hash string, packetChan chan gopacket.Packet) {
+	tc.packetHashes.store(hash, packetChan)
 }
 
 // UnregisterHash removes the given hash from the packetHashes map.
@@ -83,12 +110,10 @@ func (phm *packetHashMap) run(p gopacket.Packet) {
 	}
 }
 
-func (phm *packetHashMap) store(hash string) chan gopacket.Packet {
+func (phm *packetHashMap) store(hash string, packetChan chan gopacket.Packet) {
+	phm.m.Store(hash, packetChan)
 
-	packetMatchChannel := make(chan gopacket.Packet, 1)
-	phm.m.Store(hash, packetMatchChannel)
-
-	return packetMatchChannel
+	return
 }
 
 func (phm *packetHashMap) del(hash string) bool {

@@ -156,7 +156,8 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 
 	if tc.useListeners {
 		tc.AttachHasher(BoomerangPacketHasher)
-
+		tc.AttachHasher(V4TraceRouteHasher)
+		tc.AttachHasher(V6TraceRouteHasher)
 		// activate listeners
 		go func() {
 			for packet := range tc.rx() {

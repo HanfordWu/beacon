@@ -168,7 +168,8 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 		}
 	}
 
-	packetMatchChan := tc.RegisterHash(idHash)
+	packetMatchChan := make(chan gopacket.Packet, 1)
+	tc.RegisterHash(idHash, packetMatchChan)
 
 	go func() {
 		timeOutDuration := time.Duration(timeout) * time.Second
