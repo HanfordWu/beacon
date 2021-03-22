@@ -6,6 +6,21 @@ import (
 	"testing"
 )
 
+func BenchmarkRoutineCreation(b *testing.B) {
+	testSize := 1000
+	for n := 0; n < b.N; n ++ {
+		var wg sync.WaitGroup
+		wg.Add(testSize)
+		for i := 0; i < testSize; i++ {
+			go func() {
+				defer wg.Done()
+				return
+			}()
+		}
+		wg.Wait()
+	}
+}
+
 func BenchmarkBoomerang(b *testing.B) {
 	tc, err := NewBoomerangTransportChannel()
 	if err != nil {
@@ -13,10 +28,9 @@ func BenchmarkBoomerang(b *testing.B) {
 		b.FailNow()
 	}
 
-	// hardcoded to work in a specific crystalnet env
-	// might be useful to generalize this in some way
-	destIP := net.IP{13,106, 210, 30}
+	destIP := net.IP{10, 20, 8, 129}
 	srcIP, err := FindSourceIPForDest(destIP)
+	b.Logf("srcIP: %s", srcIP)
 	if err != nil {
 		b.Errorf("Failed to find a sourceIP for %s: %s", destIP, err)
 		b.FailNow()
@@ -24,6 +38,7 @@ func BenchmarkBoomerang(b *testing.B) {
 
 	testSize := 1000
 	testPaths := make([]Path, testSize)
+	numFailed := 0
 
 	for i := 0; i < testSize; i++ {
 		testPaths[i] = Path{
@@ -41,11 +56,14 @@ func BenchmarkBoomerang(b *testing.B) {
 				defer wg.Done()
 				result := tc.Boomerang(p, timeout)
 				if result.Err != nil {
-					b.Errorf("Boomerang call returned an error: %s", result.Err)
+					numFailed += 1
 				}
 			}(path)
 		}
 		wg.Wait()
+	}
+	if numFailed > 0 {
+		b.Errorf("number failed: %d", numFailed)
 	}
 }
 
@@ -56,10 +74,10 @@ func BenchmarkBoomerangIPV6(b *testing.B) {
 		b.FailNow()
 	}
 
-	testSize := 1000
+	testSize := 100
 	testPaths := make([]Path, testSize)
 
-	destIP := net.ParseIP("2a01:111:2000::2:f000:e")
+	destIP := net.ParseIP("2a01:111:2000::a4")
 	sourceIP, err := FindSourceIPForDest(destIP)
 	if err != nil {
 		b.Errorf("Failed to find source IP for dest %s: %s", destIP, err)
@@ -70,8 +88,6 @@ func BenchmarkBoomerangIPV6(b *testing.B) {
 		testPaths[i] = Path{
 			// hardcoded to work in a specific crystalnet env
 			// might be useful to generalize this in some way
-			// net.ParseIP("2a01:111:2000:6::10a"),
-			// net.ParseIP("2a01:111:2000::2:f000:e"),
 			sourceIP,
 			destIP,
 		}
@@ -107,7 +123,7 @@ func BenchmarkV4FindSourceIPForDest(b *testing.B) {
 }
 
 func BenchmarkV6FindSourceIPForDest(b *testing.B) {
-	destIPString := "2a01:111:2000::2:f000:e"
+	destIPString := "2a01:111:2000::a4"
 	destIP, err := ParseIPFromString(destIPString)
 	if err != nil {
 		b.Errorf("Failed to parse v6 IP from %s: %s", destIPString, err)
