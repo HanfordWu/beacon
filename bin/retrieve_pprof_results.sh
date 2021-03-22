@@ -1,8 +1,13 @@
 #!/bin/bash
 
-scp -r crystalnet@mel20-0100-0002-01sw:/home/crystalnet/moby-bench-results .
+HOST_DEVICE=$1
+if [ -z "$1" ]; then
+  HOST_DEVICE="BL20-0100-0100-02SW"
+fi					
 
-ssh crystalnet@mel20-0100-0002-01sw << EOF
+scp -r "crystalnet@$HOST_DEVICE:/home/crystalnet/moby-bench-results" .
+
+ssh "crystalnet@$HOST_DEVICE" << EOF
   bash rm -r /home/crystalnet/moby-bench-results
 EOF
 

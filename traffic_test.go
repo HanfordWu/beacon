@@ -15,7 +15,7 @@ func BenchmarkBoomerang(b *testing.B) {
 
 	// hardcoded to work in a specific crystalnet env
 	// might be useful to generalize this in some way
-	destIP := net.IP{207, 46, 33, 175}
+	destIP := net.IP{13,106, 210, 30}
 	srcIP, err := FindSourceIPForDest(destIP)
 	if err != nil {
 		b.Errorf("Failed to find a sourceIP for %s: %s", destIP, err)
