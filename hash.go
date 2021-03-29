@@ -75,8 +75,8 @@ func (tc *TransportChannel) RegisterHash(hash string, packetChan chan gopacket.P
 }
 
 // UnregisterHash removes the given hash from the packetHashes map.
-func (tc *TransportChannel) UnregisterHash(hash string) bool {
-	return tc.packetHashes.del(hash)
+func (tc *TransportChannel) UnregisterHash(hash string, closeChan bool) bool {
+	return tc.packetHashes.del(hash, closeChan)
 }
 
 type packetHashMap struct {
@@ -116,13 +116,15 @@ func (phm *packetHashMap) store(hash string, packetChan chan gopacket.Packet) {
 	return
 }
 
-func (phm *packetHashMap) del(hash string) bool {
+func (phm *packetHashMap) del(hash string, closeChan bool) bool {
 
 	packetMatchChannel, exists := phm.m.Load(hash)
 	assertedChannel := packetMatchChannel.(chan gopacket.Packet)
 
 	if exists {
-		close(assertedChannel)
+		if closeChan {
+			close(assertedChannel)
+		}
 		phm.m.Delete(hash)
 	}
 

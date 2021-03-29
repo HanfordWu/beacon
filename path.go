@@ -166,6 +166,7 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 		for matchedPacket := range packetChan {
 			tcType, tcCode := getTypeAndCode(matchedPacket, isV4)
 			SrcIP, DstIP := getSrcAndDstIP(matchedPacket, isV4)
+			fmt.Printf("received matched packet %s %s %s %s", tcType, tcCode, SrcIP, DstIP)
 			if isV4 {
 				if tcType == layers.ICMPv4TypeTimeExceeded && tcCode == layers.ICMPv4CodeTTLExceeded && DstIP.Equal(finalSourceIP) {
 					found <- SrcIP
@@ -213,12 +214,12 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 			select {
 			case ip := <-found:
 				pathChan <- ip
-				tc.UnregisterHash(hash)
+				tc.UnregisterHash(hash, false)
 			case <-time.After(time.Duration(timeout) * time.Second):
 				pathChan <- nil
-				tc.UnregisterHash(hash)
+				tc.UnregisterHash(hash, false)
 			case term := <-done:
-				tc.UnregisterHash(hash)
+				tc.UnregisterHash(hash, true)
 				if term.lastIP.Equal(term.secondToLastIP) {
 					pathChan <- term.lastIP
 					return
