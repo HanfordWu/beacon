@@ -190,9 +190,6 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create IPv6 socket for TransportChannel: %s", err)
 	}
-	if err := unix.SetsockoptInt(fd6, unix.IPPROTO_IP, unix.IPV6_HDRINCL, 1); err != nil {
-		fmt.Printf("Failed to set v6 IPHeader to not include additional IP header: %s\n", err)
-	}
 	tc.socket6FD = fd6
 	tc.socket6FailureMsgQueue = make(chan int)
 	go tc.renewSocket6FD()
