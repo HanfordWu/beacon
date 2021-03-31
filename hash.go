@@ -50,18 +50,22 @@ func V6TraceRouteHasher(packet gopacket.Packet) (string, error) {
 	if udpLayer == nil {
 		return "", fmt.Errorf("Could not find udp layer in incoming traceroute packet.")
 	}
+	fmt.Printf("found v6 trcrt hash %s\n", string(udpLayer.(*layers.UDP).BaseLayer.Contents))
 	return string(udpLayer.(*layers.UDP).BaseLayer.Contents), nil
 }
 
 func V4TraceRouteHasher(packet gopacket.Packet) (string, error) {
-appLayer := packet.ApplicationLayer()
+	appLayer := packet.ApplicationLayer()
         icmpPayload := appLayer.Payload()
+	fmt.Printf("icmpPayload: %s\n", icmpPayload)
         layerType := layers.LayerTypeIPv4
         decodedPayloadPacket := gopacket.NewPacket(icmpPayload, layerType, gopacket.Default)
         udpLayer := decodedPayloadPacket.Layer(layers.LayerTypeUDP)
         if udpLayer == nil {
                 return "", fmt.Errorf("Could not find udp layer in incoming traceroute packet.")
         }
+	fmt.Printf("udpLayer incoming %s \n", gopacket.LayerDump(udpLayer))
+	fmt.Printf("found v4 trcrt hash %s\n", string(udpLayer.(*layers.UDP).BaseLayer.Contents))
         return string(udpLayer.(*layers.UDP).BaseLayer.Contents), nil
 }
 
@@ -98,12 +102,12 @@ func (phm *packetHashMap) run(p gopacket.Packet) {
 		if err != nil {
 			continue
 		}
-
 		computedHashSlice = append(computedHashSlice, computedHash)
 	}
 
 	for _, computedHash := range computedHashSlice {
 		if packetMatchChannel, ok := phm.m.Load(computedHash); ok {
+			fmt.Printf("found matching packet\n")
 			assertedChannel := packetMatchChannel.(chan gopacket.Packet)
 			assertedChannel <- p
 		}

@@ -123,12 +123,19 @@ func (tc *TransportChannel) GetPathFromSourceToDest(sourceIP, destIP net.IP, tim
 	return path, nil
 }
 
-func ComputeTraceRouteHash(bytes []byte) (string, error) {
-	packet := gopacket.NewPacket(bytes, layers.LayerTypeUDP, gopacket.Default)
+func ComputeTraceRouteHash(bytes []byte, isV4 bool) (string, error) {
+	var packet gopacket.Packet
+	if isV4 {
+		packet = gopacket.NewPacket(bytes, layers.LayerTypeIPv4, gopacket.Default)
+	} else {
+		packet = gopacket.NewPacket(bytes, layers.LayerTypeIPv6, gopacket.Default)
+	}
+	fmt.Println(packet)
 	udpLayer := packet.Layer(layers.LayerTypeUDP)
 	if udpLayer == nil {
 		return "", fmt.Errorf("Could not find udp layer in outgoing traceroute packet, please verify packet creation.")
 	}
+	fmt.Printf("udpLayer outgoing %s \n", gopacket.LayerDump(udpLayer))
 	return string(udpLayer.(*layers.UDP).BaseLayer.Contents), nil
 }
 
@@ -200,7 +207,8 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 			if err != nil {
 				fmt.Printf("Failed to build udp tracert packet: %s\n", err)
 			}
-			hash, err := ComputeTraceRouteHash(buf.Bytes())
+			hash, err := ComputeTraceRouteHash(buf.Bytes(), isV4)
+			fmt.Printf("computed traceroute hash %s \n", hash)
 			if err != nil {
 				panic(err)
 			}
