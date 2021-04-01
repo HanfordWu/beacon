@@ -8,7 +8,7 @@ import (
 
 func BenchmarkRoutineCreation(b *testing.B) {
 	testSize := 1000
-	for n := 0; n < b.N; n ++ {
+	for n := 0; n < b.N; n++ {
 		var wg sync.WaitGroup
 		wg.Add(testSize)
 		for i := 0; i < testSize; i++ {

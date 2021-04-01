@@ -2,9 +2,9 @@ package beacon
 
 import (
 	"fmt"
-	"sync"
-	"runtime"
 	"reflect"
+	"runtime"
+	"sync"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -50,25 +50,20 @@ func V6TraceRouteHasher(packet gopacket.Packet) (string, error) {
 	if udpLayer == nil {
 		return "", fmt.Errorf("Could not find udp layer in incoming traceroute packet.")
 	}
-	fmt.Printf("found v6 trcrt hash %s\n", string(udpLayer.(*layers.UDP).BaseLayer.Contents))
 	return string(udpLayer.(*layers.UDP).BaseLayer.Contents), nil
 }
 
 func V4TraceRouteHasher(packet gopacket.Packet) (string, error) {
 	appLayer := packet.ApplicationLayer()
-        icmpPayload := appLayer.Payload()
-	fmt.Printf("icmpPayload: %s\n", icmpPayload)
-        layerType := layers.LayerTypeIPv4
-        decodedPayloadPacket := gopacket.NewPacket(icmpPayload, layerType, gopacket.Default)
-        udpLayer := decodedPayloadPacket.Layer(layers.LayerTypeUDP)
-        if udpLayer == nil {
-                return "", fmt.Errorf("Could not find udp layer in incoming traceroute packet.")
-        }
-	fmt.Printf("udpLayer incoming %s \n", gopacket.LayerDump(udpLayer))
-	fmt.Printf("found v4 trcrt hash %s\n", string(udpLayer.(*layers.UDP).BaseLayer.Contents))
-        return string(udpLayer.(*layers.UDP).BaseLayer.Contents), nil
+	icmpPayload := appLayer.Payload()
+	layerType := layers.LayerTypeIPv4
+	decodedPayloadPacket := gopacket.NewPacket(icmpPayload, layerType, gopacket.Default)
+	udpLayer := decodedPayloadPacket.Layer(layers.LayerTypeUDP)
+	if udpLayer == nil {
+		return "", fmt.Errorf("Could not find udp layer in incoming traceroute packet.")
+	}
+	return string(udpLayer.(*layers.UDP).BaseLayer.Contents), nil
 }
-
 
 // RegisterHash registers a hash to the current transport channel.
 // When a packet is receieved by the transport channel, its hash will be computed

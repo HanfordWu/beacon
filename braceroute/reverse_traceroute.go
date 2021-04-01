@@ -26,6 +26,8 @@ func ReverseTraceroute(destIP net.IP, timeout int) error {
 
 	tc, err := beacon.NewTransportChannel(
 		beacon.WithBPFFilter("icmp"),
+		beacon.WithHasher(beacon.V4TraceRouteHasher),
+		beacon.WithHasher(beacon.V6TraceRouteHasher),
 		beacon.WithInterface(interfaceDevice),
 	)
 	if err != nil {

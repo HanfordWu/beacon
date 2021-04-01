@@ -135,7 +135,6 @@ func ComputeTraceRouteHash(bytes []byte, isV4 bool) (string, error) {
 	if udpLayer == nil {
 		return "", fmt.Errorf("Could not find udp layer in outgoing traceroute packet, please verify packet creation.")
 	}
-	fmt.Printf("udpLayer outgoing %s \n", gopacket.LayerDump(udpLayer))
 	return string(udpLayer.(*layers.UDP).BaseLayer.Contents), nil
 }
 
@@ -173,7 +172,6 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 		for matchedPacket := range packetChan {
 			tcType, tcCode := getTypeAndCode(matchedPacket, isV4)
 			SrcIP, DstIP := getSrcAndDstIP(matchedPacket, isV4)
-			fmt.Printf("received matched packet %s %s %s %s", tcType, tcCode, SrcIP, DstIP)
 			if isV4 {
 				if tcType == layers.ICMPv4TypeTimeExceeded && tcCode == layers.ICMPv4CodeTTLExceeded && DstIP.Equal(finalSourceIP) {
 					found <- SrcIP
@@ -208,7 +206,6 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 				fmt.Printf("Failed to build udp tracert packet: %s\n", err)
 			}
 			hash, err := ComputeTraceRouteHash(buf.Bytes(), isV4)
-			fmt.Printf("computed traceroute hash %s \n", hash)
 			if err != nil {
 				panic(err)
 			}

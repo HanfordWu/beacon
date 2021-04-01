@@ -125,6 +125,8 @@ func findPathFromSourceToDest() (beacon.Path, error) {
 	}
 
 	pathFinderTC, err := beacon.NewTransportChannel(
+		beacon.WithHasher(beacon.V4TraceRouteHasher),
+		beacon.WithHasher(beacon.V6TraceRouteHasher),
 		beacon.WithBPFFilter(filter),
 	)
 	if err != nil {

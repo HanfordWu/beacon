@@ -7,6 +7,8 @@ import (
 	"log"
 	"math/rand"
 	"net"
+	"reflect"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -75,6 +77,14 @@ func WithSnapLen(snaplen int) TransportChannelOption {
 func WithBufferSize(bufferSize int) TransportChannelOption {
 	return func(tc *TransportChannel) {
 		tc.bufferSize = bufferSize
+	}
+}
+
+// WithHasher attaches a hasher to a transportChannel, hashers may be expensive, only attach what you need
+func WithHasher(hasher PacketHasher) TransportChannelOption {
+	return func(tc *TransportChannel) {
+		fmt.Printf("added hasher %s \n", runtime.FuncForPC(reflect.ValueOf(hasher).Pointer()).Name())
+		tc.AttachHasher(hasher)
 	}
 }
 
@@ -155,10 +165,6 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 	go tc.renewSocket6FD()
 
 	if tc.useListeners {
-		tc.AttachHasher(BoomerangPacketHasher)
-		tc.AttachHasher(V4TraceRouteHasher)
-		tc.AttachHasher(V6TraceRouteHasher)
-		fmt.Printf("added boomerang and traceroute hashers")
 		// activate listeners
 		go func() {
 			for packet := range tc.rx() {
@@ -173,7 +179,7 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 
 // NewBoomerangTransportChannel instantiates a new transport channel with an ip packet header (id:109) for the bpf
 func NewBoomerangTransportChannel(options ...TransportChannelOption) (*TransportChannel, error) {
-	options = append(options, WithBPFFilter("ip[4:2] = 0x6d || ip6[48:4] = 0x6d6f6279"))
+	options = append(options, WithBPFFilter("ip[4:2] = 0x6d || ip6[48:4] = 0x6d6f6279"), WithHasher(BoomerangPacketHasher))
 	return NewTransportChannel(options...)
 }
 
