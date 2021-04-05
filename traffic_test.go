@@ -4,20 +4,50 @@ import (
 	"net"
 	"sync"
 	"testing"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"github.com/google/uuid"
 )
 
-func BenchmarkRoutineCreation(b *testing.B) {
-	testSize := 1000
+func createTestIncomingBoomerangPacket(sourceIP, destIP net.IP) ([]byte, []byte) {
+	id := uuid.New()
+	tagString := []byte("moby")
+	idMarshalled, _ := id.MarshalBinary() // no error is possible, this is just `return u[:], nil`
+	idBytes := append(tagString, idMarshalled...)
+
+	buf := gopacket.NewSerializeBuffer()
+	buildUDPTraceroutePacket(sourceIP, destIP, layers.UDPPort(69), layers.UDPPort(69), 100, idBytes, buf)
+	return idBytes, buf.Bytes()
+}
+
+func BenchmarkBoomerangNoLatency(b *testing.B) {
+	testSize := 10000
+	packetArray := make([]gopacket.Packet, testSize)
+	packetChan := make(chan gopacket.Packet, testSize)
+	srcIP := net.IP{0, 0, 0, 0}
+	destIP := net.IP{10, 20, 8, 129}
+
+	phm := NewPacketHashMap()
+        phm.AttachHasher(BoomerangPacketHasher)
+
+	for i := 0; i < testSize; i++ {
+		// create inner packet layer
+		idHash, packetBytes := createTestIncomingBoomerangPacket(srcIP, destIP)
+		packet := gopacket.NewPacket(packetBytes, layers.LayerTypeIPv4, gopacket.Default)
+		packetArray[i] = packet
+		phm.store(string(idHash), packetChan)
+	}
 	for n := 0; n < b.N; n++ {
-		var wg sync.WaitGroup
-		wg.Add(testSize)
-		for i := 0; i < testSize; i++ {
-			go func() {
-				defer wg.Done()
-				return
-			}()
+		for _, packet := range packetArray {
+			phm.run(packet)
 		}
-		wg.Wait()
+		if len(packetChan) < testSize {
+			b.Errorf("Did not match TestSize %d number of packets, found %d packets", testSize, len(packetChan))
+		}
+		numPackets := len(packetChan)
+		for i := 0; i < numPackets; i++ {
+			<-packetChan //drain chan for next run
+		}
 	}
 }
 
@@ -74,7 +104,7 @@ func BenchmarkBoomerangIPV6(b *testing.B) {
 		b.FailNow()
 	}
 
-	testSize := 100
+	testSize := 1000
 	testPaths := make([]Path, testSize)
 
 	destIP := net.ParseIP("2a01:111:2000::a4")
