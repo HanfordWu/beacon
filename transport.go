@@ -6,15 +6,19 @@ import (
 	"io"
 	"math/rand"
 	"net"
-	"os/exec"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
-	"golang.org/x/sys/unix"
 )
+
+/*
+#include <pcap.h>
+*/
+import "C"
 
 // TransportChannel is a struct which facilitates packet tx/rx
 type TransportChannel struct {
@@ -54,31 +58,20 @@ func WithBPFFilter(filter string) TransportChannelOption {
 func WithInterface(device string) TransportChannelOption {
 	return func(tc *TransportChannel) {
 		if device == "bsdany" {
-			// Pick single bundle to listen on, prioritizing IBR adjacent ones
-			out, err := exec.Command("cli", "-c", "show isis adjacency").Output()
+			ifaces, err := pcap.FindAllDevs()
 			if err != nil {
-				log.Printf("Failed to show interfaces, due to error: %s\n", err)
-				return
+				log.Printf("Failed to get interfaces for listening on with bsdany option: %v", err)
 			}
-			// Leave out header line of output
-			lines := strings.Split(string(out), "\n")[1:]
-			tc.deviceNames = []string{}
-			for _, line := range lines {
-				// Get device name, which will be at beginning of line, e.g. 'lo0:'
-				fields := strings.Fields(line)
-				if len(fields) == 5 {
-					device := strings.ReplaceAll(fields[0], ".0", "")
-
-					if len(device) > 0 {
-						tc.deviceNames = append(tc.deviceNames, device)
-						log.Printf("bsdany: added device %s to listen on\n", device)
-					}
+			tc.deviceNames = make([]string, len(ifaces))
+			for idx, iface := range ifaces {
+				// Check if interface is up
+				if iface.Flags&C.PCAP_IF_UP > 0 {
+					tc.deviceNames[idx] = iface.Name
 				}
 			}
-			log.Printf("interfaces: %s\n", tc.deviceNames)
-			return
+		} else {
+			tc.deviceNames = []string{device}
 		}
-		tc.deviceNames = []string{device}
 	}
 }
 
@@ -175,18 +168,18 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 
 	// open a raw socket, the IPPROTO_RAW protocol implies IP_HDRINCL is enabled
 	// http://man7.org/linux/man-pages/man7/raw.7.html
-	fd, err := unix.Socket(unix.AF_INET, unix.SOCK_RAW, unix.IPPROTO_RAW)
+	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create IPv4 socket for TransportChannel: %s", err)
 	}
-	if err := unix.SetsockoptInt(fd, unix.IPPROTO_IP, unix.IP_HDRINCL, 1); err != nil {
+	if err := syscall.SetsockoptInt(fd, syscall.IPPROTO_IP, syscall.IP_HDRINCL, 1); err != nil {
 		return nil, fmt.Errorf("Failed to set v4 IPHeader to not include additional IP header: %s", err)
 	}
 	tc.socketFD = fd
 	tc.socketFailureMsgQueue = make(chan int)
 	go tc.renewSocketFD()
 
-	fd6, err := unix.Socket(unix.AF_INET6, unix.SOCK_RAW, unix.IPPROTO_RAW)
+	fd6, err := syscall.Socket(syscall.AF_INET6, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create IPv6 socket for TransportChannel: %s", err)
 	}
@@ -225,13 +218,13 @@ func (tc *TransportChannel) renewSocketFD() error {
 			continue
 		}
 		log.Println("Renewing SocketFD")
-		fd, err := unix.Socket(unix.AF_INET, unix.SOCK_RAW, unix.IPPROTO_RAW)
+		fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
 		if err != nil {
 			log.Printf("Failed to create IPv4 socket for TransportChannel: %s", err)
 		}
 		tc.socketFD = fd
 		if brokenFD != fd {
-			unix.Close(brokenFD)
+			syscall.Close(brokenFD)
 		}
 	}
 	return nil
@@ -244,13 +237,13 @@ func (tc *TransportChannel) renewSocket6FD() error {
 			continue
 		}
 		log.Println("Renewing socket6FD")
-		fd6, err := unix.Socket(unix.AF_INET6, unix.SOCK_RAW, unix.IPPROTO_RAW)
+		fd6, err := syscall.Socket(syscall.AF_INET6, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
 		if err != nil {
 			log.Printf("Failed to create IPv6 socket for TransportChannel: %s", err)
 		}
 		tc.socket6FD = fd6
 		if broken6FD != fd6 {
-			unix.Close(broken6FD)
+			syscall.Close(broken6FD)
 		}
 	}
 	return nil
@@ -301,14 +294,14 @@ func (tc *TransportChannel) packetsToChannel() {
 				}
 
 				// Immediately retry for EAGAIN
-				if err == unix.EAGAIN {
+				if err == syscall.EAGAIN {
 					continue
 				}
 
 				// Immediately break for known unrecoverable errors
 				if err == io.EOF || err == io.ErrUnexpectedEOF ||
 					err == io.ErrNoProgress || err == io.ErrClosedPipe || err == io.ErrShortBuffer ||
-					err == unix.EBADF ||
+					err == syscall.EBADF ||
 					strings.Contains(err.Error(), "use of closed file") {
 					break
 				}
@@ -331,11 +324,11 @@ func (tc *TransportChannel) SendTo(packetData []byte, destAddr net.IP) error {
 	if destAddrTo4 == nil {
 		var destAddr16 [16]byte
 		copy(destAddr16[:], destAddr.To16()[:16])
-		addr := unix.SockaddrInet6{
+		addr := syscall.SockaddrInet6{
 			Addr: destAddr16,
 		}
 		fd6Int := tc.socket6FD
-		err = unix.Sendto(fd6Int, packetData, 0, &addr)
+		err = syscall.Sendto(fd6Int, packetData, 0, &addr)
 		if err != nil {
 			tc.socket6FailureMsgQueue <- fd6Int
 			return fmt.Errorf("Failed to send packetData to socket6FD: %s", err)
@@ -343,11 +336,11 @@ func (tc *TransportChannel) SendTo(packetData []byte, destAddr net.IP) error {
 	} else {
 		var destAddr4 [4]byte
 		copy(destAddr4[:], destAddrTo4)
-		addr := unix.SockaddrInet4{
+		addr := syscall.SockaddrInet4{
 			Addr: destAddr4,
 		}
 		fdInt := tc.socketFD
-		err = unix.Sendto(fdInt, packetData, 0, &addr)
+		err = syscall.Sendto(fdInt, packetData, 0, &addr)
 		if err != nil {
 			tc.socketFailureMsgQueue <- fdInt
 			return fmt.Errorf("Failed to send packetData to socketFD: %s", err)
@@ -366,7 +359,7 @@ func (tc *TransportChannel) SendToPath(packetData []byte, path Path) error {
 
 // Close cleans up resources for the transport channel instance
 func (tc *TransportChannel) Close() {
-	unix.Close(tc.socketFD)
+	syscall.Close(tc.socketFD)
 	tc.handle.Close()
 }
 
