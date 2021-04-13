@@ -130,7 +130,6 @@ func ComputeTraceRouteHash(bytes []byte, isV4 bool) (string, error) {
 	} else {
 		packet = gopacket.NewPacket(bytes, layers.LayerTypeIPv6, gopacket.Default)
 	}
-	fmt.Println(packet)
 	udpLayer := packet.Layer(layers.LayerTypeUDP)
 	if udpLayer == nil {
 		return "", fmt.Errorf("Could not find udp layer in outgoing traceroute packet, please verify packet creation.")

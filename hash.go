@@ -13,11 +13,6 @@ import (
 // PacketHasher produces some hash for a given packet which uniquely identifies a packet.
 type PacketHasher func(gopacket.Packet) (string, error)
 
-func (tc *TransportChannel) AttachHasher(hasher PacketHasher) error {
-	err := tc.packetHashes.AttachHasher(hasher)
-	return err
-}
-
 // AttachHasher attaches a packet hasher to the current transport channel.
 // When a packet is receieved by the transport channel, its hash will be computed
 // by the each of the attached Hashers, and if the resulting hash identifies a packet
@@ -122,10 +117,10 @@ func (phm *packetHashMap) store(hash string, packetChan chan gopacket.Packet) {
 func (phm *packetHashMap) del(hash string, closeChan bool) bool {
 
 	packetMatchChannel, exists := phm.m.Load(hash)
-	assertedChannel := packetMatchChannel.(chan gopacket.Packet)
 
 	if exists {
 		if closeChan {
+			assertedChannel := packetMatchChannel.(chan gopacket.Packet)
 			close(assertedChannel)
 		}
 		phm.m.Delete(hash)

@@ -1,12 +1,12 @@
 package beacon
 
 import (
-	"net"
-	"sync"
-	"testing"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/uuid"
+	"net"
+	"sync"
+	"testing"
 )
 
 func createTestIncomingBoomerangPacket(sourceIP, destIP net.IP) ([]byte, []byte) {
@@ -28,7 +28,7 @@ func BenchmarkBoomerangNoLatency(b *testing.B) {
 	destIP := net.IP{10, 20, 8, 129}
 
 	phm := NewPacketHashMap()
-        phm.AttachHasher(BoomerangPacketHasher)
+	phm.AttachHasher(BoomerangPacketHasher)
 
 	for i := 0; i < testSize; i++ {
 		// create inner packet layer

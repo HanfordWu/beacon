@@ -84,7 +84,7 @@ func WithBufferSize(bufferSize int) TransportChannelOption {
 func WithHasher(hasher PacketHasher) TransportChannelOption {
 	return func(tc *TransportChannel) {
 		fmt.Printf("added hasher %s \n", runtime.FuncForPC(reflect.ValueOf(hasher).Pointer()).Name())
-		tc.AttachHasher(hasher)
+		tc.packetHashes.AttachHasher(hasher)
 	}
 }
 
