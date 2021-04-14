@@ -20,6 +20,7 @@ import (
 type TransportChannel struct {
 	handle                 *pcap.Handle
 	packetSource           *gopacket.PacketSource
+	packetHashes           *packetHashMap
 	listenerMap            *ListenerMap
 	portLock               sync.Mutex
 	packets                chan gopacket.Packet
@@ -77,6 +78,14 @@ func WithBufferSize(bufferSize int) TransportChannelOption {
 	}
 }
 
+// WithHasher attaches a hasher to a transportChannel, hashers may be expensive, only attach what you need
+func WithHasher(hasher PacketHasher) TransportChannelOption {
+	return func(tc *TransportChannel) {
+		fmt.Printf("added hasher %s \n", hasher.Name())
+		tc.packetHashes.AttachHasher(hasher)
+	}
+}
+
 // UseListeners sets up the TransportChannel for listener use or not
 func UseListeners(useListeners bool) TransportChannelOption {
 	return func(tc *TransportChannel) {
@@ -97,6 +106,7 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 		srcPortOffset: rand.Intn(maxPortOffset),
 		dstPortOffset: rand.Intn(maxPortOffset),
 		listenerMap:   NewListenerMap(),
+		packetHashes:  NewPacketHashMap(),
 		useListeners:  true,
 	}
 
@@ -156,6 +166,7 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 		// activate listeners
 		go func() {
 			for packet := range tc.rx() {
+				go tc.packetHashes.run(packet)
 				go tc.listenerMap.Run(packet)
 			}
 		}()
@@ -166,7 +177,7 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 
 // NewBoomerangTransportChannel instantiates a new transport channel with an ip packet header (id:109) for the bpf
 func NewBoomerangTransportChannel(options ...TransportChannelOption) (*TransportChannel, error) {
-	options = append(options, WithBPFFilter("ip[4:2] = 0x6d || ip6[48:4] = 0x6d6f6279"))
+	options = append(options, WithBPFFilter(fmt.Sprintf("ip[4:2] = %s || ip6[48:4] = %s", boomerangSigV4, boomerangSigV6)), WithHasher(BoomerangPacketHasher{}))
 	return NewTransportChannel(options...)
 }
 

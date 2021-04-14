@@ -30,6 +30,8 @@ func Traceroute(destinationIP string, sourceIP string, timeout int, interfaceDev
 
 	tc, err := NewTransportChannel(
 		WithBPFFilter("icmp"),
+		WithHasher(V4TraceRouteHasher{}),
+		WithHasher(V6TraceRouteHasher{}),
 		WithInterface(interfaceDevice),
 		WithTimeout(100),
 	)

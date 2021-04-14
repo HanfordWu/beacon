@@ -123,6 +123,20 @@ func (tc *TransportChannel) GetPathFromSourceToDest(sourceIP, destIP net.IP, tim
 	return path, nil
 }
 
+func ComputeTraceRouteHash(bytes []byte, isV4 bool) (string, error) {
+	var packet gopacket.Packet
+	if isV4 {
+		packet = gopacket.NewPacket(bytes, layers.LayerTypeIPv4, gopacket.Default)
+	} else {
+		packet = gopacket.NewPacket(bytes, layers.LayerTypeIPv6, gopacket.Default)
+	}
+	udpLayer := packet.Layer(layers.LayerTypeUDP)
+	if udpLayer == nil {
+		return "", fmt.Errorf("Could not find udp layer in outgoing traceroute packet, please verify packet creation.")
+	}
+	return string(udpLayer.(*layers.UDP).BaseLayer.Contents), nil
+}
+
 // GetPathChannelTo returns a PathChannel to a destination IP from the caller
 func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout int) (PathChannel, error) {
 
@@ -150,17 +164,8 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 	}
 	isV4 := finalSourceIP.To4() != nil
 
+	packetChan := make(chan gopacket.Packet, 1)
 	ports := tc.newTraceroutePortPair()
-
-	criteria := func(packet gopacket.Packet, id []byte) bool {
-		appLayer := packet.ApplicationLayer()
-		icmpPayload := appLayer.Payload()
-		matches := tracerouteResponseMatchesPortPair(icmpPayload, ports, isV4)
-		return matches
-	}
-
-	listener := NewPersistentListener(criteria)
-	packetChan := tc.RegisterListener(listener)
 
 	go func() {
 		for matchedPacket := range packetChan {
@@ -191,7 +196,6 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 	go func() {
 		// wait for listener to be ready to recv
 		defer close(pathChan)
-		defer tc.UnregisterListener(listener)
 		buf := gopacket.NewSerializeBuffer()
 
 		var ttl uint8
@@ -200,6 +204,11 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 			if err != nil {
 				fmt.Printf("Failed to build udp tracert packet: %s\n", err)
 			}
+			hash, err := ComputeTraceRouteHash(buf.Bytes(), isV4)
+			if err != nil {
+				panic(err)
+			}
+			tc.RegisterHash(hash, packetChan)
 
 			err = tc.SendTo(buf.Bytes(), destIP)
 			if err != nil {
@@ -209,9 +218,12 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 			select {
 			case ip := <-found:
 				pathChan <- ip
+				tc.UnregisterHash(hash, false)
 			case <-time.After(time.Duration(timeout) * time.Second):
 				pathChan <- nil
+				tc.UnregisterHash(hash, false)
 			case term := <-done:
+				tc.UnregisterHash(hash, true)
 				if term.lastIP.Equal(term.secondToLastIP) {
 					pathChan <- term.lastIP
 					return
