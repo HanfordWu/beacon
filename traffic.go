@@ -49,8 +49,8 @@ func (tc *TransportChannel) DiscoverAndProbe(src, dst net.IP, numPackets, timeou
 	tracerouteTC, err := NewTransportChannel(
 		WithInterface("any"),
 		WithBPFFilter("icmp"),
-		WithHasher(V4TraceRouteHasher),
-		WithHasher(V6TraceRouteHasher),
+		WithHasher(V4TraceRouteHasher{}),
+		WithHasher(V6TraceRouteHasher{}),
 		UseListeners(false),
 	)
 	if err != nil {

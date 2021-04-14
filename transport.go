@@ -7,8 +7,6 @@ import (
 	"log"
 	"math/rand"
 	"net"
-	"reflect"
-	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -83,7 +81,7 @@ func WithBufferSize(bufferSize int) TransportChannelOption {
 // WithHasher attaches a hasher to a transportChannel, hashers may be expensive, only attach what you need
 func WithHasher(hasher PacketHasher) TransportChannelOption {
 	return func(tc *TransportChannel) {
-		fmt.Printf("added hasher %s \n", runtime.FuncForPC(reflect.ValueOf(hasher).Pointer()).Name())
+		fmt.Printf("added hasher %s \n", hasher.Name())
 		tc.packetHashes.AttachHasher(hasher)
 	}
 }
@@ -179,7 +177,7 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 
 // NewBoomerangTransportChannel instantiates a new transport channel with an ip packet header (id:109) for the bpf
 func NewBoomerangTransportChannel(options ...TransportChannelOption) (*TransportChannel, error) {
-	options = append(options, WithBPFFilter("ip[4:2] = 0x6d || ip6[48:4] = 0x6d6f6279"), WithHasher(BoomerangPacketHasher))
+	options = append(options, WithBPFFilter(fmt.Sprintf("ip[4:2] = %s || ip6[48:4] = %s", boomerangSigV4, boomerangSigV6)), WithHasher(BoomerangPacketHasher{}))
 	return NewTransportChannel(options...)
 }
 

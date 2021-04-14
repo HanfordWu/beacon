@@ -11,4 +11,7 @@ const (
 	icmpPortUnreachable = 771
 
 	maxPortOffset = 89
+
+	boomerangSigV4 = "0x6d"
+	boomerangSigV6 = "0x6d6f6279"
 )
