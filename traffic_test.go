@@ -23,7 +23,7 @@ func createTestIncomingBoomerangPacket(sourceIP, destIP net.IP) ([]byte, []byte)
 func BenchmarkBoomerangNoLatency(b *testing.B) {
 	testSize := 10000
 	packetArray := make([]gopacket.Packet, testSize)
-	packetChan := make(chan gopacket.Packet, testSize)
+	hashArray := make([]string, testSize)
 	srcIP := net.IP{0, 0, 0, 0}
 	destIP := net.IP{10, 20, 8, 129}
 
@@ -35,18 +35,25 @@ func BenchmarkBoomerangNoLatency(b *testing.B) {
 		idHash, packetBytes := createTestIncomingBoomerangPacket(srcIP, destIP)
 		packet := gopacket.NewPacket(packetBytes, layers.LayerTypeIPv4, gopacket.Default)
 		packetArray[i] = packet
-		phm.store(string(idHash), packetChan)
+		hashArray[i] = string(idHash)
 	}
 	for n := 0; n < b.N; n++ {
-		for _, packet := range packetArray {
+		matchedPackets := 0
+		for i, packet := range packetArray {
+			idHash := hashArray[i]
+			packetChan := make(chan gopacket.Packet, 1)
+			phm.store(string(idHash), packetChan)
+			go func() {
+				//var ok gopacket.Packet
+				_, ok := <-packetChan
+				if ok {
+					matchedPackets += 1
+				}
+			}()
 			phm.run(packet)
 		}
-		if len(packetChan) < testSize {
-			b.Errorf("Did not match TestSize %d number of packets, found %d packets", testSize, len(packetChan))
-		}
-		numPackets := len(packetChan)
-		for i := 0; i < numPackets; i++ {
-			<-packetChan //drain chan for next run
+		if matchedPackets < testSize {
+			b.Errorf("Did not match TestSize %d number of packets, found %d packets", testSize, matchedPackets)
 		}
 	}
 }
@@ -77,7 +84,7 @@ func BenchmarkBoomerang(b *testing.B) {
 		}
 	}
 
-	timeout := 1
+	timeout := 3
 	for n := 0; n < b.N; n++ {
 		var wg sync.WaitGroup
 		wg.Add(testSize)

@@ -182,7 +182,7 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 		err := tc.SendToPath(packetData, path)
 		if err != nil {
 			fmt.Printf("error in SendToPath: %s\n", err)
-			tc.UnregisterHash(idHash, true)
+			tc.UnregisterHash(idHash)
 
 			resultChan <- BoomerangResult{
 				Err:       err,
@@ -214,7 +214,7 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 			result.Payload.TxTimestamp = txTimestamp
 			resultChan <- result
 		case <-timer.C:
-			tc.UnregisterHash(idHash, true)
+			tc.UnregisterHash(idHash)
 			resultChan <- BoomerangResult{
 				Payload: BoomerangPayload{
 					ID:          id,

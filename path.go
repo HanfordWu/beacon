@@ -164,10 +164,9 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 	}
 	isV4 := finalSourceIP.To4() != nil
 
-	packetChan := make(chan gopacket.Packet, 1)
 	ports := tc.newTraceroutePortPair()
 
-	go func() {
+	var ReceiveTraceroutePackets = func(packetChan chan gopacket.Packet) {
 		for matchedPacket := range packetChan {
 			tcType, tcCode := getTypeAndCode(matchedPacket, isV4)
 			SrcIP, DstIP := getSrcAndDstIP(matchedPacket, isV4)
@@ -191,7 +190,7 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 				}
 			}
 		}
-	}()
+	}
 
 	go func() {
 		// wait for listener to be ready to recv
@@ -208,7 +207,9 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 			if err != nil {
 				panic(err)
 			}
+			packetChan := make(chan gopacket.Packet, 1)
 			tc.RegisterHash(hash, packetChan)
+			go ReceiveTraceroutePackets(packetChan)
 
 			err = tc.SendTo(buf.Bytes(), destIP)
 			if err != nil {
@@ -218,12 +219,12 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 			select {
 			case ip := <-found:
 				pathChan <- ip
-				tc.UnregisterHash(hash, false)
+				tc.UnregisterHash(hash)
 			case <-time.After(time.Duration(timeout) * time.Second):
 				pathChan <- nil
-				tc.UnregisterHash(hash, false)
+				tc.UnregisterHash(hash)
 			case term := <-done:
-				tc.UnregisterHash(hash, true)
+				tc.UnregisterHash(hash)
 				if term.lastIP.Equal(term.secondToLastIP) {
 					pathChan <- term.lastIP
 					return
