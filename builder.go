@@ -2,6 +2,7 @@ package beacon
 
 import (
 	"errors"
+	"math/rand"
 	"net"
 
 	"github.com/google/gopacket"
@@ -236,8 +237,8 @@ func CreateRoundTripPacketForPath(path Path, payload []byte, buf gopacket.Serial
 	}
 
 	udpLayer := &layers.UDP{
-		SrcPort: 25199,
-		DstPort: 28525,
+		SrcPort: generateRandomUDPPort(),
+		DstPort: generateRandomUDPPort(),
 		Length:  uint16(udpHeaderLen + len(payload)),
 	}
 
@@ -259,4 +260,9 @@ func CreateRoundTripPacketForPath(path Path, payload []byte, buf gopacket.Serial
 		return err
 	}
 	return nil
+}
+
+// generateRandomUDPPort generates a UDPPort in the range (0, 65535)
+func generateRandomUDPPort() layers.UDPPort {
+	return layers.UDPPort(rand.Intn(65535))
 }
