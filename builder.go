@@ -264,5 +264,6 @@ func CreateRoundTripPacketForPath(path Path, payload []byte, buf gopacket.Serial
 
 // generateRandomUDPPort generates a UDPPort in the range (0, 65535)
 func generateRandomUDPPort() layers.UDPPort {
-	return layers.UDPPort(rand.Intn(65535))
+	generatedPort := udpMinPort + rand.Intn(udpMaxPort-udpMinPort)
+	return layers.UDPPort(generatedPort)
 }
