@@ -65,13 +65,9 @@ func TestCreateRoundTripPacketForPath(t *testing.T) {
 
 		t.Logf("layer %d: %s -> %s, %s\n", idx, actualSrc, actualDst, actualProto)
 
-		expectedSrc := expectedLayerInfos[idx].src
 		expectedDst := expectedLayerInfos[idx].dst
 		expectedProto := expectedLayerInfos[idx].proto
 
-		if !actualSrc.Equal(expectedSrc) {
-			t.Errorf("Mismatch while checking src IP of layer %d in constructed packet, expected %s, got %s", idx, expectedSrc, actualSrc)
-		}
 		if !actualDst.Equal(expectedDst) {
 			t.Errorf("Mismatch while checking dst IP of layer %d in constructed packet, expected %s, got %s", idx, expectedDst, actualDst)
 		}

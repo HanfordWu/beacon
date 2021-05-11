@@ -4,7 +4,7 @@ build:
 	go build ./...
 
 test:
-	go test
+	go test -v ./...
 
 integration-test:
 	docker build . -f ./dockerfiles/Dockerfile.integration -t beacon-integration:latest && \
