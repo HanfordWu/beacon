@@ -10,6 +10,10 @@ import (
 )
 
 func buildIPv4EncapLayer(sourceIP, destIP net.IP) *layers.IPv4 {
+	if sourceIP == nil {
+		sourceIP = net.IPv4(uint8(rand.Intn(64)), uint8(rand.Intn(256)), uint8(rand.Intn(256)), uint8(rand.Intn(256)))
+	}
+
 	ipipLayer := &layers.IPv4{
 		Version:  4,
 		IHL:      5,
@@ -228,7 +232,7 @@ func CreateRoundTripPacketForPath(path Path, payload []byte, buf gopacket.Serial
 		hopB := path[idx+1]
 
 		if hopA.To4() != nil {
-			constructedLayers[idx] = buildIPv4EncapLayer(hopA, hopB)
+			constructedLayers[idx] = buildIPv4EncapLayer(nil, hopB)
 			constructedLayers[numLayers-idx-1] = buildIPv4EncapLayer(hopB, hopA)
 		} else {
 			constructedLayers[idx] = buildIPv6EncapLayer(hopA, hopB)
