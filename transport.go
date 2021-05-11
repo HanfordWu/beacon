@@ -176,7 +176,12 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 
 // NewBoomerangTransportChannel instantiates a new transport channel with an ip packet header (id:109) for the bpf
 func NewBoomerangTransportChannel(options ...TransportChannelOption) (*TransportChannel, error) {
-	options = append(options, WithBPFFilter(fmt.Sprintf("ip[4:2] = %s || ip6[48:4] = %s", boomerangSigV4, boomerangSigV6)), WithHasher(BoomerangPacketHasher{}))
+	BoomerangTCOptions := []TransportChannelOption{
+		WithBPFFilter(fmt.Sprintf("ip[4:2] = %s || ip6[48:4] = %s", boomerangSigV4, boomerangSigV6)),
+		WithHasher(BoomerangPacketHasher{}),
+	}
+
+	options = append(options, BoomerangTCOptions...)
 	return NewTransportChannel(options...)
 }
 
