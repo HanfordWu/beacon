@@ -81,7 +81,6 @@ func WithBufferSize(bufferSize int) TransportChannelOption {
 // WithHasher attaches a hasher to a transportChannel, hashers may be expensive, only attach what you need
 func WithHasher(hasher PacketHasher) TransportChannelOption {
 	return func(tc *TransportChannel) {
-		fmt.Printf("added hasher %s \n", hasher.Name())
 		tc.packetHashes.AttachHasher(hasher)
 	}
 }
