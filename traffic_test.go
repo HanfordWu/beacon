@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"net"
 	"sync"
+	"sync/atomic"
 	"testing"
 )
 
@@ -38,21 +39,27 @@ func BenchmarkBoomerangNoLatency(b *testing.B) {
 		hashArray[i] = string(idHash)
 	}
 	for n := 0; n < b.N; n++ {
-		matchedPackets := 0
+		var wg sync.WaitGroup
+		wg.Add(testSize)
+
+		var matchedPackets uint64
+
 		for i, packet := range packetArray {
 			idHash := hashArray[i]
-			packetChan := make(chan gopacket.Packet, 1)
+			packetChan := make(chan gopacket.Packet)
 			phm.store(string(idHash), packetChan)
-			go func() {
-				//var ok gopacket.Packet
-				_, ok := <-packetChan
+			go func(pc chan gopacket.Packet) {
+				defer wg.Done()
+				_, ok := <-pc
 				if ok {
-					matchedPackets += 1
+					atomic.AddUint64(&matchedPackets, 1)
 				}
-			}()
+			}(packetChan)
 			phm.run(packet)
 		}
-		if matchedPackets < testSize {
+
+		wg.Wait()
+		if matchedPackets < uint64(testSize) {
 			b.Errorf("Did not match TestSize %d number of packets, found %d packets", testSize, matchedPackets)
 		}
 	}
@@ -67,13 +74,12 @@ func BenchmarkBoomerang(b *testing.B) {
 
 	destIP := net.IP{10, 20, 8, 129}
 	srcIP, err := FindSourceIPForDest(destIP)
-	b.Logf("srcIP: %s", srcIP)
 	if err != nil {
 		b.Errorf("Failed to find a sourceIP for %s: %s", destIP, err)
 		b.FailNow()
 	}
 
-	testSize := 1000
+	testSize := 100
 	testPaths := make([]Path, testSize)
 	numFailed := 0
 
