@@ -10,6 +10,9 @@ const (
 	icmpEchoReply       = 0
 	icmpPortUnreachable = 771
 
+	udpMinPort = 25000
+	udpMaxPort = 30000
+
 	maxPortOffset = 89
 
 	boomerangSigV4 = "0x6d"

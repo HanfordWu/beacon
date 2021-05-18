@@ -72,7 +72,7 @@ func BenchmarkBoomerang(b *testing.B) {
 		b.FailNow()
 	}
 
-	destIP := net.IP{10, 20, 8, 129}
+	destIP := net.IP{207, 46, 33, 85}
 	srcIP, err := FindSourceIPForDest(destIP)
 	if err != nil {
 		b.Errorf("Failed to find a sourceIP for %s: %s", destIP, err)

@@ -2,6 +2,7 @@ package beacon
 
 import (
 	"errors"
+	"math/rand"
 	"net"
 
 	"github.com/google/gopacket"
@@ -9,6 +10,10 @@ import (
 )
 
 func buildIPv4EncapLayer(sourceIP, destIP net.IP) *layers.IPv4 {
+	if sourceIP == nil {
+		sourceIP = net.IPv4(10, uint8(rand.Intn(32)), uint8(rand.Intn(32)), uint8(rand.Intn(32)))
+	}
+
 	ipipLayer := &layers.IPv4{
 		Version:  4,
 		IHL:      5,
@@ -227,7 +232,7 @@ func CreateRoundTripPacketForPath(path Path, payload []byte, buf gopacket.Serial
 		hopB := path[idx+1]
 
 		if hopA.To4() != nil {
-			constructedLayers[idx] = buildIPv4EncapLayer(hopA, hopB)
+			constructedLayers[idx] = buildIPv4EncapLayer(nil, hopB)
 			constructedLayers[numLayers-idx-1] = buildIPv4EncapLayer(hopB, hopA)
 		} else {
 			constructedLayers[idx] = buildIPv6EncapLayer(hopA, hopB)
@@ -259,4 +264,10 @@ func CreateRoundTripPacketForPath(path Path, payload []byte, buf gopacket.Serial
 		return err
 	}
 	return nil
+}
+
+// generateRandomUDPPort generates a UDPPort in the range (0, 65535)
+func generateRandomUDPPort() layers.UDPPort {
+	generatedPort := udpMinPort + rand.Intn(udpMaxPort-udpMinPort)
+	return layers.UDPPort(generatedPort)
 }
