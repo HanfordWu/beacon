@@ -241,8 +241,8 @@ func CreateRoundTripPacketForPath(path Path, payload []byte, buf gopacket.Serial
 	}
 
 	udpLayer := &layers.UDP{
-		SrcPort: generateRandomUDPPort(),
-		DstPort: generateRandomUDPPort(),
+		SrcPort: 25199,
+		DstPort: 28525,
 		Length:  uint16(udpHeaderLen + len(payload)),
 	}
 
