@@ -11,7 +11,7 @@ import (
 
 func buildIPv4EncapLayer(sourceIP, destIP net.IP) *layers.IPv4 {
 	if sourceIP == nil {
-		sourceIP = net.IPv4(uint8(rand.Intn(64)), uint8(rand.Intn(256)), uint8(rand.Intn(256)), uint8(rand.Intn(256)))
+		sourceIP = net.IPv4(10, uint8(rand.Intn(32)), uint8(rand.Intn(32)), uint8(rand.Intn(32)))
 	}
 
 	ipipLayer := &layers.IPv4{
