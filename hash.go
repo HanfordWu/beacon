@@ -51,6 +51,9 @@ type V6TraceRouteHasher struct{}
 
 func (v V6TraceRouteHasher) HashPacket(packet gopacket.Packet) (string, error) {
 	appLayer := packet.ApplicationLayer()
+	if appLayer == nil {
+		return "", fmt.Errorf("Could not find application layer in incoming traceroute packet")
+	}
 	icmpPayload := appLayer.Payload()
 	layerType := layers.LayerTypeIPv6
 	icmpPayload = icmpPayload[4:]
@@ -70,6 +73,9 @@ type V4TraceRouteHasher struct{}
 
 func (v V4TraceRouteHasher) HashPacket(packet gopacket.Packet) (string, error) {
 	appLayer := packet.ApplicationLayer()
+	if appLayer == nil {
+		return "", fmt.Errorf("Could not find application layer in incoming traceroute packet")
+	}
 	icmpPayload := appLayer.Payload()
 	layerType := layers.LayerTypeIPv4
 	decodedPayloadPacket := gopacket.NewPacket(icmpPayload, layerType, gopacket.Default)
