@@ -56,6 +56,9 @@ func (v V6TraceRouteHasher) HashPacket(packet gopacket.Packet) (string, error) {
 	}
 	icmpPayload := appLayer.Payload()
 	layerType := layers.LayerTypeIPv6
+    if len(icmpPayload) < 4 {
+        return "", fmt.Errorf("Incoming traceroute packet must have payload of len >= 4")
+    }
 	icmpPayload = icmpPayload[4:]
 	decodedPayloadPacket := gopacket.NewPacket(icmpPayload, layerType, gopacket.Default)
 	udpLayer := decodedPayloadPacket.Layer(layers.LayerTypeUDP)
