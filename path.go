@@ -123,7 +123,7 @@ func (tc *TransportChannel) GetPathFromSourceToDest(sourceIP, destIP net.IP, tim
 	return path, nil
 }
 
-func computeTraceRouteHashFromPacket(packet gopacket.Packet, isV4 bool) (string, error) {
+func computeTraceRouteHashFromPacket(packet gopacket.Packet) (string, error) {
 	udpLayer := packet.Layer(layers.LayerTypeUDP)
 	if udpLayer == nil {
 		return "", fmt.Errorf("Could not find udp layer in outgoing traceroute packet, please verify packet creation.")
@@ -147,7 +147,7 @@ func computeTraceRouteHash(bytes []byte, isV4 bool) (string, error) {
 		packet = gopacket.NewPacket(bytes, layers.LayerTypeIPv6, gopacket.Default)
 	}
 
-	return computeTraceRouteHashFromPacket(packet, isV4)
+	return computeTraceRouteHashFromPacket(packet)
 }
 
 // GetPathChannelTo returns a PathChannel to a destination IP from the caller
