@@ -61,11 +61,8 @@ func (v V6TraceRouteHasher) HashPacket(packet gopacket.Packet) (string, error) {
 	}
 	icmpPayload = icmpPayload[4:]
 	decodedPayloadPacket := gopacket.NewPacket(icmpPayload, layerType, gopacket.Default)
-	udpLayer := decodedPayloadPacket.Layer(layers.LayerTypeUDP)
-	if udpLayer == nil {
-		return "", fmt.Errorf("Could not find udp layer in incoming traceroute packet.")
-	}
-	return string(udpLayer.(*layers.UDP).BaseLayer.Contents), nil
+
+	return computeTraceRouteHashFromPacket(decodedPayloadPacket)
 }
 
 func (v V6TraceRouteHasher) Name() string {
@@ -82,11 +79,8 @@ func (v V4TraceRouteHasher) HashPacket(packet gopacket.Packet) (string, error) {
 	icmpPayload := appLayer.Payload()
 	layerType := layers.LayerTypeIPv4
 	decodedPayloadPacket := gopacket.NewPacket(icmpPayload, layerType, gopacket.Default)
-	udpLayer := decodedPayloadPacket.Layer(layers.LayerTypeUDP)
-	if udpLayer == nil {
-		return "", fmt.Errorf("Could not find udp layer in incoming traceroute packet.")
-	}
-	return string(udpLayer.(*layers.UDP).BaseLayer.Contents), nil
+
+	return computeTraceRouteHashFromPacket(decodedPayloadPacket)
 }
 
 func (v V4TraceRouteHasher) Name() string {

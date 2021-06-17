@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/trstruth/beacon"
 )
 
@@ -11,12 +9,7 @@ func Traceroute(destIP string, sourceIP string, timeout int32, interfaceDevice s
 
 	timeoutInt := int(timeout)
 
-	response, err := beacon.Traceroute(destIP, sourceIP, timeoutInt, interfaceDevice)
-	if err != nil {
-		return err
-	}
+	_, err := beacon.Traceroute(destIP, sourceIP, timeoutInt, interfaceDevice)
 
-	fmt.Println(response)
-
-	return nil
+	return err
 }
