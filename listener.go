@@ -5,6 +5,10 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/uuid"
+
+	"github.com/sirupsen/logrus"
+	lSyslog "github.com/sirupsen/logrus/hooks/syslog"
+	"log/syslog"
 )
 
 // PacketFilter represents a criteria that a packet can be said to meet.
@@ -17,6 +21,8 @@ type Listener struct {
 	matchChan  chan gopacket.Packet
 	persistent bool
 }
+
+var log = logrus.New()
 
 // NewListener return a new listener with the given criteria,
 // a newly generated uuid and an initialized match channel.
@@ -51,6 +57,14 @@ type ListenerMap struct {
 
 // NewListenerMap returns a new ListenerMap and initializes the appropriate fields.
 func NewListenerMap() *ListenerMap {
+	var hook, err = lSyslog.NewSyslogHook("", "", syslog.LOG_INFO, "")
+	if err == nil {
+		log.Infof("moby-canary: Adding syslog hook")
+		log.Hooks.Add(hook)
+	} else {
+		log.Errorf("moby-canary: Error getting syslog hook in canary main: %s", err)
+	}
+
 	return &ListenerMap{
 		m: make(map[uuid.UUID]*Listener),
 	}
