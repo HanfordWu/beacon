@@ -343,11 +343,11 @@ type JuniperTLV struct {
 	Type   uint8
 	Length uint8
 	Value  []byte
-	//Description		string
-	//ValueStr		string
 }
 
 const JuniperLayerName = "Juniper"
+
+var MagicBytes = []byte{byte(0x4d), byte(0x47), byte(0x43)}
 
 var JuniperLayerType = gopacket.RegisterLayerType(
 	26361,
@@ -366,14 +366,16 @@ func (j *JuniperLayer) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) 
 		df.SetTruncated()
 		return fmt.Errorf("Invalid JuniperTLV Header. Length %d < 6", len(data))
 	}
-	var magicBytes = []byte{byte(0x4d), byte(0x47), byte(0x43)}
-	if bytes.Compare(data[0:3], magicBytes) != 0 {
+	j.MagicBytes = data[:3]
+	if bytes.Compare(j.MagicBytes, MagicBytes) != 0 {
 		return fmt.Errorf("Incorrect MagicBytes 0x%06x != 0x4d4743", j.MagicBytes)
 	}
-	j.MagicBytes = data[0:3]
-	j.FlagPacketIn = (data[3] & JuniperFlagPacketIn) == JuniperFlagPacketIn
-	j.FlagNoL2 = (data[3] & JuniperFlagNoL2) == JuniperFlagNoL2
-	j.FlagExtensions = (data[3] & JuniperFlagExtensions) == JuniperFlagExtensions
+
+	flags := data[3]
+	j.FlagPacketIn = (flags & JuniperFlagPacketIn) == JuniperFlagPacketIn
+	j.FlagExtensions = (flags & JuniperFlagExtensions) == JuniperFlagExtensions
+	j.FlagNoL2 = (flags & JuniperFlagNoL2) == JuniperFlagNoL2
+
 	j.TLVLength = binary.BigEndian.Uint16(data[4:6])
 	headerLength := 6 + j.TLVLength
 	if uint16(len(data)) < headerLength {
@@ -412,7 +414,6 @@ func (j *JuniperLayer) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) 
 }
 
 func (j *JuniperLayer) NextLayerType() gopacket.LayerType {
-	// Assume Ethernet header next for now
 	switch j.NextHeader {
 	case juniperNextLayerIPv6:
 		return layers.LayerTypeIPv6
@@ -429,7 +430,7 @@ func (j *JuniperLayer) CanDecode() gopacket.LayerClass {
 	return JuniperLayerType
 }
 
-// This one hasn't been tested yet
+// This would be used to send packets with headers, but is currently not used for anything
 func (j *JuniperLayer) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) error {
 	headerBytes, err := b.PrependBytes(int(6 + j.TLVLength))
 	if err != nil {
@@ -478,18 +479,10 @@ func decodeJuniperLayer(data []byte, p gopacket.PacketBuilder) error {
 func decodeJuniperTLV(data []byte) (*JuniperTLV, error) {
 	t := &JuniperTLV{}
 	t.Type = data[0]
-	//t.Description = ExtStrings[t.Type]
 	t.Length = data[1]
 	if uint8(len(data)) < t.Length+2 {
 		return t, fmt.Errorf("TLV Length >= data size")
 	}
-	// Value is the rest of the TLV data
 	t.Value = data[2 : 2+t.Length]
-	//switch t.Type {
-	//case JuniperExtTLVIFDMediaType:
-	//	t.ValueStr = ExtIFMLStrings[uint8(t.Value[0])]
-	//case JuniperExtTLVIFLEncaps:
-	//	t.ValueStr = ExtIFLEStrings[uint8(t.Value[0])]
-	//}
 	return t, nil
 }

@@ -6,25 +6,21 @@ import (
 	"io"
 	"math/rand"
 	"net"
+	"os/exec"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
+	"syscall"
 )
-
-/*
-#include <pcap.h>
-*/
-import "C"
 
 // TransportChannel is a struct which facilitates packet tx/rx
 type TransportChannel struct {
-	handle                 *pcap.Handle
-	packetHashes           *packetHashMap
+	handles                []*pcap.Handle
 	packetSources          []*gopacket.PacketSource
+	packetHashes           *packetHashMap
 	listenerMap            *ListenerMap
 	portLock               sync.Mutex
 	packets                chan gopacket.Packet
@@ -58,20 +54,30 @@ func WithBPFFilter(filter string) TransportChannelOption {
 func WithInterface(device string) TransportChannelOption {
 	return func(tc *TransportChannel) {
 		if device == "bsdany" {
-			ifaces, err := pcap.FindAllDevs()
+			out, err := exec.Command("/usr/sbin/cli", "-c", "show isis adjacency").Output()
 			if err != nil {
-				log.Printf("Failed to get interfaces for listening on with bsdany option: %v", err)
+				log.Printf("Failed to show interfaces: %s\n", err)
+				return
 			}
-			tc.deviceNames = make([]string, len(ifaces))
-			for idx, iface := range ifaces {
-				// Check if interface is up
-				if iface.Flags&C.PCAP_IF_UP > 0 {
-					tc.deviceNames[idx] = iface.Name
+			lines := strings.Split(string(out), "\n")[1:]
+			tc.deviceNames = []string{}
+			for _, line := range lines {
+				// Get device name, which will be at beginning of line, e.g. 'lo0:'
+				fields := strings.Fields(line)
+				if len(fields) == 5 {
+					device := strings.ReplaceAll(fields[0], ".0", "")
+
+					if len(device) > 0 {
+						tc.deviceNames = append(tc.deviceNames, device)
+						log.Printf("bsdany: added device %s to listen on\n", device)
+					}
 				}
+				break // For testing, only listen on 1 device
 			}
-		} else {
-			tc.deviceNames = []string{device}
+			log.Printf("interfaces: %s\n", tc.deviceNames)
+			return
 		}
+		tc.deviceNames = []string{device}
 	}
 }
 
@@ -132,6 +138,7 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 	}
 
 	tc.packetSources = make([]*gopacket.PacketSource, len(tc.deviceNames))
+	tc.handles = make([]*pcap.Handle, len(tc.deviceNames))
 
 	for idx, deviceName := range tc.deviceNames {
 		inactive, err := pcap.NewInactiveHandle(deviceName)
@@ -154,7 +161,7 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 		if err != nil {
 			return nil, err
 		}
-		tc.handle = handle
+		tc.handles[idx] = handle
 
 		if tc.filter != "" {
 			err = handle.SetBPFFilter(tc.filter)
@@ -251,11 +258,20 @@ func (tc *TransportChannel) renewSocket6FD() error {
 
 // Stats displays the stats exposed by the underlying packet handle of a TransportChannel.
 func (tc *TransportChannel) Stats() string {
-	stats, err := tc.handle.Stats()
-	if err != nil {
-		return fmt.Sprintf("Encountered an error trying to produce handle stats: %s", err)
+	statsList := ""
+	for i, handle := range tc.handles {
+		if i >= len(tc.deviceNames) {
+			return fmt.Sprintf("Could not find device name for handle")
+		}
+		dev := tc.deviceNames[i]
+		stats, err := handle.Stats()
+		if err != nil {
+			return fmt.Sprintf("Encountered an error trying to produce handle stats: %s", err)
+		}
+		statsList += fmt.Sprintf("Stats for device %v:\n %+v\n", dev, stats)
 	}
-	return fmt.Sprintf("%+v", stats)
+
+	return statsList
 }
 
 // rx returns a packet channel over which packets will be pushed onto
@@ -360,7 +376,9 @@ func (tc *TransportChannel) SendToPath(packetData []byte, path Path) error {
 // Close cleans up resources for the transport channel instance
 func (tc *TransportChannel) Close() {
 	syscall.Close(tc.socketFD)
-	tc.handle.Close()
+	for _, handle := range tc.handles {
+		handle.Close()
+	}
 }
 
 // FindLocalIP finds the IP of the interface device of the TransportChannel instance

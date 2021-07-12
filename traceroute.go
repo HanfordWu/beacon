@@ -20,9 +20,9 @@ func Traceroute(destinationIP string, sourceIP string, timeout int, interfaceDev
 
 	destHostname, err := net.LookupAddr(destIP.String())
 	if err != nil {
-		fmt.Printf("Doing traceroute to %s\n", destIP)
+		log.Printf("Doing traceroute to %s\n", destIP)
 	} else {
-		fmt.Printf("Doing traceroute to %s (%s)\n", destHostname[0], destIP)
+		log.Printf("Doing traceroute to %s (%s)\n", destHostname[0], destIP)
 	}
 
 	if interfaceDevice == "" {
@@ -58,11 +58,11 @@ func Traceroute(destinationIP string, sourceIP string, timeout int, interfaceDev
 
 	hopIdx := 1
 	for hop := range pc {
-		fmt.Printf("%d: ", hopIdx)
+		log.Printf("%d: ", hopIdx)
 		hopIdx++
 
 		if hop == nil {
-			fmt.Println("*")
+			log.Println("*")
 			route = append(route, "*")
 			continue
 		}

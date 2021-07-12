@@ -71,7 +71,7 @@ func (tc *TransportChannel) DiscoverAndProbe(src, dst net.IP, numPackets, timeou
 	prePath := []net.IP{srcIP}
 
 	path = append(prePath, path...)
-	fmt.Printf("found path: %v\n", path)
+	log.Printf("found path: %v\n", path)
 
 	return tc.ProbeEachHopOfPath(path, numPackets, timeout), nil
 }

@@ -6,8 +6,8 @@ import (
 	"net"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/trstruth/beacon"
+	"github.com/spf13/cobra"
 )
 
 var dest string
