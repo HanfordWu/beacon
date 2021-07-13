@@ -177,8 +177,6 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 	}
 	isV4 := finalSourceIP.To4() != nil
 
-	ports := tc.newTraceroutePortPair()
-
 	// inspects packets that match the traceroute hash and sends them on appropriate channels
 	handleTracerouteReturn := func(packetChan chan gopacket.Packet) {
 		for matchedPacket := range packetChan {
@@ -217,6 +215,7 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 			packetChan := make(chan gopacket.Packet, 1)
 			go handleTracerouteReturn(packetChan)
 
+			ports := tc.newTraceroutePortPair()
 			err := buildUDPTraceroutePacket(finalSourceIP, destIP, ports.src, ports.dst, ttl, []byte("traceroute"), buf)
 			if err != nil {
 				fmt.Printf("Failed to build udp tracert packet: %s\n", err)

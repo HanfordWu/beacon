@@ -11,6 +11,11 @@ func Traceroute(destinationIP string, sourceIP string, timeout int, interfaceDev
 
 	var destIP net.IP = net.ParseIP(destinationIP)
 
+	filter := "icmp"
+	if destIP.To4() == nil {
+		filter = "icmp6"
+	}
+
 	route := make([]string, 0)
 
 	destHostname, err := net.LookupAddr(destIP.String())
@@ -29,7 +34,7 @@ func Traceroute(destinationIP string, sourceIP string, timeout int, interfaceDev
 	}
 
 	tc, err := NewTransportChannel(
-		WithBPFFilter("icmp"),
+		WithBPFFilter(filter),
 		WithHasher(V4TraceRouteHasher{}),
 		WithHasher(V6TraceRouteHasher{}),
 		WithInterface(interfaceDevice),
@@ -42,6 +47,8 @@ func Traceroute(destinationIP string, sourceIP string, timeout int, interfaceDev
 	var srcIP net.IP = nil
 	if len(sourceIP) > 0 {
 		srcIP = net.ParseIP(sourceIP)
+	} else {
+		srcIP, _ = FindSourceIPForDest(destIP)
 	}
 
 	pc, err := tc.GetPathChannelTo(destIP, srcIP, timeout)
@@ -60,15 +67,13 @@ func Traceroute(destinationIP string, sourceIP string, timeout int, interfaceDev
 			continue
 		}
 
-		hostname, err := net.LookupAddr(hop.String())
-		if err != nil {
-			fmt.Println(hop.String())
-			route = append(route, hop.String())
-
-		} else {
-			fmt.Printf("%s (%s)\n", hostname[0], hop.String())
-			route = append(route, fmt.Sprintf("%s (%s)\n", hostname[0], hop.String()))
+		var hostname = "Unknown"
+		hostnames, err := net.LookupAddr(hop.String())
+		if err == nil && len(hostnames) > 0 {
+			hostname = hostnames[0]
 		}
+		fmt.Printf("%s (%s)\n", hostname, hop.String())
+		route = append(route, fmt.Sprintf("%s (%s)\n", hostname, hop.String()))
 	}
 
 	return route, nil
