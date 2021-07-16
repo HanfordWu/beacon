@@ -232,7 +232,7 @@ func CreateRoundTripPacketForPath(path Path, payload []byte, buf gopacket.Serial
 		hopB := path[idx+1]
 
 		if hopA.To4() != nil {
-			constructedLayers[idx] = buildIPv4EncapLayer(nil, hopB)
+			constructedLayers[idx] = buildIPv4EncapLayer(hopA, hopB)
 			constructedLayers[numLayers-idx-1] = buildIPv4EncapLayer(hopB, hopA)
 		} else {
 			constructedLayers[idx] = buildIPv6EncapLayer(hopA, hopB)
