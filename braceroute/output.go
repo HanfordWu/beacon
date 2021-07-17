@@ -42,17 +42,17 @@ func newProbeStats(path beacon.Path, totalPackets int, interfaceDevice string) *
 	return &s
 }
 
-// TODO: refactor to allow this function to propagate lookup errors
 func (s *probeStats) recordResponse(hop string, successful bool) {
 	s.Lock()
-	idx, ok := s.hopToIdxMapping[hop]
-	if !ok {
-		log.Fatalf("tried to record response for hop: %s which doesn't exist in the mapping: %+v\n", hop, s.hopToIdxMapping)
-		return
-	}
 	if successful {
+		idx, ok := s.hopToIdxMapping[hop]
+		if !ok {
+			// TODO: refactor to allow this function to propagate lookup errors
+			log.Fatalf("tried to record response for hop: %s which doesn't exist in the mapping: %+v\n", hop, s.hopToIdxMapping)
+		}
 		s.hopStatSlice[idx].success()
 	} else {
+		idx := s.hopToIdxMapping[hop]
 		s.hopStatSlice[idx].failure()
 	}
 	s.Unlock()
