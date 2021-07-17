@@ -171,12 +171,15 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 		tc.packetSources[idx] = CreatePacketSource(handle)
 	}
 
-	// open a raw socket, the IPPROTO_RAW protocol implies IP_HDRINCL is enabled
+	// open a raw socket
 	// http://man7.org/linux/man-pages/man7/raw.7.html
 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create IPv4 socket for TransportChannel: %s", err)
 	}
+	// IPPROTO_RAW protocol implies IP_HDRINCL on linux, however on freebsd we must set it explicitly
+	// so that no IP header is automatically appended to the IP packets we craft
+	// https://www.freebsd.org/cgi/man.cgi?query=ip&sektion=4&manpath=FreeBSD+12.0-RELEASE
 	if err := syscall.SetsockoptInt(fd, syscall.IPPROTO_IP, syscall.IP_HDRINCL, 1); err != nil {
 		return nil, fmt.Errorf("Failed to set v4 IPHeader to not include additional IP header: %s", err)
 	}
