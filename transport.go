@@ -41,23 +41,23 @@ type TransportChannel struct {
 // TransportChannelOption modifies a TransportChannel struct
 // The TransportChannel constructor accepts a variadic parameter
 // of TransportChannelOptions, each of which will be invoked upon construction
-type TransportChannelOption func(*TransportChannel)
+type TransportChannelOption func(*TransportChannel) error
 
 // WithBPFFilter constructs an option to set BPFFilter via the TransportChannel constructor
 func WithBPFFilter(filter string) TransportChannelOption {
-	return func(tc *TransportChannel) {
+	return func(tc *TransportChannel) error {
 		tc.filter = filter
+		return nil
 	}
 }
 
 // WithInterface constructs an option to set the outbound interface to use for tx/rx
 func WithInterface(device string) TransportChannelOption {
-	return func(tc *TransportChannel) {
+	return func(tc *TransportChannel) error {
 		if device == "bsdany" {
 			out, err := exec.Command("/usr/sbin/cli", "-c", "show isis adjacency").Output()
 			if err != nil {
-				log.Debugf("Failed to show interfaces: %s\n", err)
-				return
+				return fmt.Errorf("Listening on bsdany: failed to show interfaces: %s")
 			}
 			lines := strings.Split(string(out), "\n")[1:]
 			tc.deviceNames = []string{}
@@ -73,44 +73,50 @@ func WithInterface(device string) TransportChannelOption {
 					}
 				}
 			}
-			return
+		} else {
+			tc.deviceNames = []string{device}
 		}
-		tc.deviceNames = []string{device}
+		return nil
 	}
 }
 
 // WithTimeout sets the timeout on the enclosed pcap Handle
 func WithTimeout(timeout int) TransportChannelOption {
-	return func(tc *TransportChannel) {
+	return func(tc *TransportChannel) error {
 		tc.timeout = timeout
+		return nil
 	}
 }
 
 // WithSnapLen sets the snaplen on the enclosed pcap Handle
 func WithSnapLen(snaplen int) TransportChannelOption {
-	return func(tc *TransportChannel) {
+	return func(tc *TransportChannel) error {
 		tc.snaplen = snaplen
+		return nil
 	}
 }
 
 // WithBufferSize sets the buffer size on the enclosed pcap Handle
 func WithBufferSize(bufferSize int) TransportChannelOption {
-	return func(tc *TransportChannel) {
+	return func(tc *TransportChannel) error {
 		tc.bufferSize = bufferSize
+		return nil
 	}
 }
 
 // WithHasher attaches a hasher to a transportChannel, hashers may be expensive, only attach what you need
 func WithHasher(hasher PacketHasher) TransportChannelOption {
-	return func(tc *TransportChannel) {
+	return func(tc *TransportChannel) error {
 		tc.packetHashes.AttachHasher(hasher)
+		return nil
 	}
 }
 
 // UseListeners sets up the TransportChannel for listener use or not
 func UseListeners(useListeners bool) TransportChannelOption {
-	return func(tc *TransportChannel) {
+	return func(tc *TransportChannel) error {
 		tc.useListeners = useListeners
+		return nil
 	}
 }
 
@@ -132,7 +138,10 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 	}
 
 	for _, opt := range options {
-		opt(tc)
+		err := opt(tc)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to apply TransportChannelOption: %v", err)
+		}
 	}
 
 	tc.packetSources = make([]*gopacket.PacketSource, len(tc.deviceNames))
