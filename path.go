@@ -158,8 +158,8 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 		return nil, errors.New(errMsg)
 	}
 
-	log.Printf("transport channel is using BPF filter: %s\n", tc.filter)
-	log.Printf("transport channel is using interface: %s\n", tc.deviceNames)
+	log.Debugf("transport channel is using BPF filter: %s\n", tc.filter)
+	log.Debugf("transport channel is using interface: %s\n", tc.deviceNames)
 
 	pathChan := make(PathChannel)
 	found := make(chan net.IP)
@@ -218,7 +218,7 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 			ports := tc.newTraceroutePortPair()
 			err := buildUDPTraceroutePacket(finalSourceIP, destIP, ports.src, ports.dst, ttl, []byte("traceroute"), buf)
 			if err != nil {
-				log.Printf("Failed to build udp tracert packet: %s\n", err)
+				log.Debugf("Failed to build udp tracert packet: %s\n", err)
 			}
 			hash, err := computeTraceRouteHash(buf.Bytes(), isV4)
 			if err != nil {
@@ -228,7 +228,7 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 
 			err = tc.SendTo(buf.Bytes(), destIP)
 			if err != nil {
-				log.Printf("error sending packet: %s", err)
+				log.Debugf("error sending packet: %s", err)
 			}
 
 			select {

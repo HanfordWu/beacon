@@ -56,7 +56,7 @@ func WithInterface(device string) TransportChannelOption {
 		if device == "bsdany" {
 			out, err := exec.Command("/usr/sbin/cli", "-c", "show isis adjacency").Output()
 			if err != nil {
-				log.Printf("Failed to show interfaces: %s\n", err)
+				log.Debugf("Failed to show interfaces: %s\n", err)
 				return
 			}
 			lines := strings.Split(string(out), "\n")[1:]
@@ -69,11 +69,10 @@ func WithInterface(device string) TransportChannelOption {
 
 					if len(device) > 0 {
 						tc.deviceNames = append(tc.deviceNames, device)
-						log.Printf("bsdany: added device %s to listen on\n", device)
+						log.Debugf("Listening on bsdany: added device %s to listen on\n", device)
 					}
 				}
 			}
-			log.Printf("interfaces: %s\n", tc.deviceNames)
 			return
 		}
 		tc.deviceNames = []string{device}
@@ -223,10 +222,10 @@ func (tc *TransportChannel) renewSocketFD() error {
 		if brokenFD != tc.socketFD {
 			continue
 		}
-		log.Println("Renewing SocketFD")
+		log.Debugln("Renewing SocketFD")
 		fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
 		if err != nil {
-			log.Printf("Failed to create IPv4 socket for TransportChannel: %s", err)
+			log.Debugf("Failed to create IPv4 socket for TransportChannel: %s", err)
 		}
 		tc.socketFD = fd
 		if brokenFD != fd {
@@ -242,10 +241,10 @@ func (tc *TransportChannel) renewSocket6FD() error {
 		if broken6FD != tc.socket6FD {
 			continue
 		}
-		log.Println("Renewing socket6FD")
+		log.Debugln("Renewing socket6FD")
 		fd6, err := syscall.Socket(syscall.AF_INET6, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
 		if err != nil {
-			log.Printf("Failed to create IPv6 socket for TransportChannel: %s", err)
+			log.Debugf("Failed to create IPv6 socket for TransportChannel: %s", err)
 		}
 		tc.socket6FD = fd6
 		if broken6FD != fd6 {

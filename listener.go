@@ -57,12 +57,14 @@ type ListenerMap struct {
 
 // NewListenerMap returns a new ListenerMap and initializes the appropriate fields.
 func NewListenerMap() *ListenerMap {
-	var hook, err = lSyslog.NewSyslogHook("", "", syslog.LOG_INFO, "")
+	// Send all logs of severity debug and higher to syslog, which is all of them
+	// Set to LOG_INFO to exclude debug logs
+	var hook, err = lSyslog.NewSyslogHook("", "", syslog.LOG_DEBUG, "")
 	if err == nil {
-		log.Infof("moby-canary: Adding syslog hook")
+		log.Debugf("Adding syslog hook")
 		log.Hooks.Add(hook)
 	} else {
-		log.Errorf("moby-canary: Error getting syslog hook in canary main: %s", err)
+		log.Debugf("Error getting syslog hook: %s", err)
 	}
 
 	return &ListenerMap{

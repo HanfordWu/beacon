@@ -71,7 +71,7 @@ func (tc *TransportChannel) DiscoverAndProbe(src, dst net.IP, numPackets, timeou
 	prePath := []net.IP{srcIP}
 
 	path = append(prePath, path...)
-	log.Printf("found path: %v\n", path)
+	log.Debugf("found path: %v\n", path)
 
 	return tc.ProbeEachHopOfPath(path, numPackets, timeout), nil
 }
@@ -181,7 +181,7 @@ func (tc *TransportChannel) Boomerang(path Path, timeout int) BoomerangResult {
 
 		err := tc.SendToPath(packetData, path)
 		if err != nil {
-			fmt.Printf("error in SendToPath: %s\n", err)
+			log.Debugf("error in SendToPath: %s\n", err)
 			tc.UnregisterHash(idHash)
 
 			resultChan <- BoomerangResult{
