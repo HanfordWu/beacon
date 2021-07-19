@@ -50,6 +50,7 @@ func Traceroute(destinationIP string, sourceIP string, timeout int, interfaceDev
 	} else {
 		srcIP, _ = FindSourceIPForDest(destIP)
 	}
+	route = append(route, srcIP.String())
 
 	pc, err := tc.GetPathChannelTo(destIP, srcIP, timeout)
 	if err != nil {
