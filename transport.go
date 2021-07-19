@@ -72,7 +72,6 @@ func WithInterface(device string) TransportChannelOption {
 						log.Printf("bsdany: added device %s to listen on\n", device)
 					}
 				}
-				break // For testing, only listen on 1 device
 			}
 			log.Printf("interfaces: %s\n", tc.deviceNames)
 			return
