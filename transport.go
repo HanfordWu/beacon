@@ -59,9 +59,12 @@ func WithInterface(device string) TransportChannelOption {
 			if err != nil {
 				return fmt.Errorf("Listening on bsdany: failed to show interfaces: %v", err)
 			}
-			lines := strings.Split(string(out), "\n")[1:]
 			tc.deviceNames = []string{}
-			for _, line := range lines {
+			lines := strings.Split(string(out), "\n")
+			if len(lines) < 2 {
+				return fmt.Errorf("Listening on bsdany: no available interfaces to listen on")
+			}
+			for _, line := range lines[1:] {
 				// Get device name, which will be at beginning of line, e.g. 'lo0:'
 				fields := strings.Fields(line)
 				if len(fields) == 5 {
@@ -72,6 +75,9 @@ func WithInterface(device string) TransportChannelOption {
 						log.Printf("Listening on bsdany: added device %s to listen on\n", device)
 					}
 				}
+			}
+			if len(tc.deviceNames) == 0 {
+				return fmt.Errorf("Listening on bsdany: found no devices to listen on")
 			}
 		} else {
 			tc.deviceNames = []string{device}
