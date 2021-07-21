@@ -59,12 +59,12 @@ type ListenerMap struct {
 func NewListenerMap() *ListenerMap {
 	// Send all logs of severity debug and higher to syslog, which is all of them
 	// Set to LOG_INFO to exclude debug logs
-	var hook, err = lSyslog.NewSyslogHook("", "", syslog.LOG_DEBUG, "")
+	var hook, err = lSyslog.NewSyslogHook("", "", syslog.LOG_INFO, "")
 	if err == nil {
-		log.Debugf("Adding syslog hook")
+		log.Printf("Adding syslog hook")
 		log.Hooks.Add(hook)
 	} else {
-		log.Debugf("Error getting syslog hook: %s", err)
+		log.Printf("Error getting syslog hook: %s", err)
 	}
 
 	return &ListenerMap{
