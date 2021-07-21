@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"math/rand"
 	"net"
+	"os/exec"
 	"strings"
 	"sync"
 	"syscall"
@@ -18,8 +18,8 @@ import (
 
 // TransportChannel is a struct which facilitates packet tx/rx
 type TransportChannel struct {
-	handle                 *pcap.Handle
-	packetSource           *gopacket.PacketSource
+	handles                []*pcap.Handle
+	packetSources          []*gopacket.PacketSource
 	packetHashes           *packetHashMap
 	listenerMap            *ListenerMap
 	portLock               sync.Mutex
@@ -28,7 +28,7 @@ type TransportChannel struct {
 	socketFailureMsgQueue  chan int
 	socket6FD              int
 	socket6FailureMsgQueue chan int
-	deviceName             string
+	deviceNames            []string
 	snaplen                int
 	bufferSize             int
 	srcPortOffset          int
@@ -41,54 +41,88 @@ type TransportChannel struct {
 // TransportChannelOption modifies a TransportChannel struct
 // The TransportChannel constructor accepts a variadic parameter
 // of TransportChannelOptions, each of which will be invoked upon construction
-type TransportChannelOption func(*TransportChannel)
+type TransportChannelOption func(*TransportChannel) error
 
 // WithBPFFilter constructs an option to set BPFFilter via the TransportChannel constructor
 func WithBPFFilter(filter string) TransportChannelOption {
-	return func(tc *TransportChannel) {
+	return func(tc *TransportChannel) error {
 		tc.filter = filter
+		return nil
 	}
 }
 
 // WithInterface constructs an option to set the outbound interface to use for tx/rx
 func WithInterface(device string) TransportChannelOption {
-	return func(tc *TransportChannel) {
-		tc.deviceName = device
+	return func(tc *TransportChannel) error {
+		if device == "bsdany" {
+			out, err := exec.Command("/usr/sbin/cli", "-c", "show isis adjacency").Output()
+			if err != nil {
+				return fmt.Errorf("Listening on bsdany: failed to show interfaces: %v", err)
+			}
+			tc.deviceNames = []string{}
+			lines := strings.Split(string(out), "\n")
+			if len(lines) < 2 {
+				return fmt.Errorf("Listening on bsdany: no available interfaces to listen on")
+			}
+			for _, line := range lines[1:] {
+				// Get device name, which will be at beginning of line, e.g. 'lo0:'
+				fields := strings.Fields(line)
+				if len(fields) == 5 {
+					device := strings.ReplaceAll(fields[0], ".0", "")
+
+					if len(device) > 0 {
+						tc.deviceNames = append(tc.deviceNames, device)
+						log.Printf("Listening on bsdany: added device %s to listen on\n", device)
+					}
+				}
+			}
+			if len(tc.deviceNames) == 0 {
+				return fmt.Errorf("Listening on bsdany: found no devices to listen on")
+			}
+		} else {
+			tc.deviceNames = []string{device}
+		}
+		return nil
 	}
 }
 
 // WithTimeout sets the timeout on the enclosed pcap Handle
 func WithTimeout(timeout int) TransportChannelOption {
-	return func(tc *TransportChannel) {
+	return func(tc *TransportChannel) error {
 		tc.timeout = timeout
+		return nil
 	}
 }
 
 // WithSnapLen sets the snaplen on the enclosed pcap Handle
 func WithSnapLen(snaplen int) TransportChannelOption {
-	return func(tc *TransportChannel) {
+	return func(tc *TransportChannel) error {
 		tc.snaplen = snaplen
+		return nil
 	}
 }
 
 // WithBufferSize sets the buffer size on the enclosed pcap Handle
 func WithBufferSize(bufferSize int) TransportChannelOption {
-	return func(tc *TransportChannel) {
+	return func(tc *TransportChannel) error {
 		tc.bufferSize = bufferSize
+		return nil
 	}
 }
 
 // WithHasher attaches a hasher to a transportChannel, hashers may be expensive, only attach what you need
 func WithHasher(hasher PacketHasher) TransportChannelOption {
-	return func(tc *TransportChannel) {
+	return func(tc *TransportChannel) error {
 		tc.packetHashes.AttachHasher(hasher)
+		return nil
 	}
 }
 
 // UseListeners sets up the TransportChannel for listener use or not
 func UseListeners(useListeners bool) TransportChannelOption {
-	return func(tc *TransportChannel) {
+	return func(tc *TransportChannel) error {
 		tc.useListeners = useListeners
+		return nil
 	}
 }
 
@@ -99,7 +133,7 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 	tc := &TransportChannel{
 		snaplen:       4800,
 		bufferSize:    16 * 1024 * 1024,
-		deviceName:    "any",
+		deviceNames:   []string{"any"},
 		filter:        "",
 		timeout:       100,
 		srcPortOffset: rand.Intn(maxPortOffset),
@@ -110,44 +144,58 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 	}
 
 	for _, opt := range options {
-		opt(tc)
+		if err := opt(tc); err != nil {
+			return nil, fmt.Errorf("Failed to apply TransportChannelOption: %v", err)
+		}
 	}
 
-	inactive, err := pcap.NewInactiveHandle(tc.deviceName)
-	if err != nil {
-		return nil, err
-	}
-	defer inactive.CleanUp()
+	tc.packetSources = make([]*gopacket.PacketSource, len(tc.deviceNames))
+	tc.handles = make([]*pcap.Handle, len(tc.deviceNames))
 
-	if err := inactive.SetImmediateMode(true); err != nil {
-		return nil, err
-	} else if err := inactive.SetSnapLen(tc.snaplen); err != nil {
-		return nil, err
-	} else if err := inactive.SetBufferSize(tc.bufferSize); err != nil {
-		return nil, err
-	} else if err := inactive.SetTimeout(time.Millisecond * time.Duration(tc.timeout)); err != nil { // set negative timeout, mechanics described here: https://godoc.org/github.com/google/gopacket/pcap#hdr-PCAP_Timeouts
-		return nil, err
-	}
-
-	handle, err := inactive.Activate()
-	if err != nil {
-		return nil, err
-	}
-	tc.handle = handle
-
-	if tc.filter != "" {
-		err = handle.SetBPFFilter(tc.filter)
+	for idx, deviceName := range tc.deviceNames {
+		inactive, err := pcap.NewInactiveHandle(deviceName)
 		if err != nil {
 			return nil, err
 		}
-	}
-	tc.packetSource = gopacket.NewPacketSource(handle, handle.LinkType())
+		defer inactive.CleanUp()
 
-	// open a raw socket, the IPPROTO_RAW protocol implies IP_HDRINCL is enabled
+		if err := inactive.SetImmediateMode(true); err != nil {
+			return nil, err
+		} else if err := inactive.SetSnapLen(tc.snaplen); err != nil {
+			return nil, err
+		} else if err := inactive.SetBufferSize(tc.bufferSize); err != nil {
+			return nil, err
+		} else if err := inactive.SetTimeout(time.Millisecond * time.Duration(tc.timeout)); err != nil { // set negative timeout, mechanics described here: https://godoc.org/github.com/google/gopacket/pcap#hdr-PCAP_Timeouts
+			return nil, err
+		}
+
+		handle, err := inactive.Activate()
+		if err != nil {
+			return nil, err
+		}
+		tc.handles[idx] = handle
+
+		if tc.filter != "" {
+			err = handle.SetBPFFilter(tc.filter)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		tc.packetSources[idx] = CreatePacketSource(handle)
+	}
+
+	// open a raw socket
 	// http://man7.org/linux/man-pages/man7/raw.7.html
 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create IPv4 socket for TransportChannel: %s", err)
+	}
+	// IPPROTO_RAW protocol implies IP_HDRINCL on linux, however on freebsd we must set it explicitly
+	// so that no IP header is automatically appended to the IP packets we craft
+	// https://www.freebsd.org/cgi/man.cgi?query=ip&sektion=4&manpath=FreeBSD+12.0-RELEASE
+	if err := syscall.SetsockoptInt(fd, syscall.IPPROTO_IP, syscall.IP_HDRINCL, 1); err != nil {
+		return nil, fmt.Errorf("Failed to set v4 IPHeader to not include additional IP header: %s", err)
 	}
 	tc.socketFD = fd
 	tc.socketFailureMsgQueue = make(chan int)
@@ -225,11 +273,20 @@ func (tc *TransportChannel) renewSocket6FD() error {
 
 // Stats displays the stats exposed by the underlying packet handle of a TransportChannel.
 func (tc *TransportChannel) Stats() string {
-	stats, err := tc.handle.Stats()
-	if err != nil {
-		return fmt.Sprintf("Encountered an error trying to produce handle stats: %s", err)
+	statsList := ""
+	for i, handle := range tc.handles {
+		if i >= len(tc.deviceNames) {
+			return fmt.Sprintf("Could not find device name for handle")
+		}
+		dev := tc.deviceNames[i]
+		stats, err := handle.Stats()
+		if err != nil {
+			return fmt.Sprintf("Encountered an error trying to produce handle stats: %s", err)
+		}
+		statsList += fmt.Sprintf("Stats for device %v:\n %+v\n", dev, stats)
 	}
-	return fmt.Sprintf("%+v", stats)
+
+	return statsList
 }
 
 // rx returns a packet channel over which packets will be pushed onto
@@ -247,36 +304,47 @@ func (tc *TransportChannel) rx() chan gopacket.Packet {
 // to the given channel. This routine terminates when a non-temporary error
 // is returned by NextPacket().
 func (tc *TransportChannel) packetsToChannel() {
-
 	defer close(tc.packets)
-	for {
-		packet, err := tc.packetSource.NextPacket()
-		if err == nil {
-			tc.packets <- packet
-			continue
-		}
+	waitOnDevices := sync.WaitGroup{}
+	waitOnDevices.Add(len(tc.packetSources))
 
-		// Immediately retry for temporary network errors
-		if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
-			continue
-		}
+	for _, packetSource := range tc.packetSources {
+		go func(p *gopacket.PacketSource) {
+			defer waitOnDevices.Done()
 
-		// Immediately retry for EAGAIN
-		if err == syscall.EAGAIN {
-			continue
-		}
+			for {
+				packet, err := p.NextPacket()
+				if err == nil {
+					tc.packets <- packet
+					continue
+				}
 
-		// Immediately break for known unrecoverable errors
-		if err == io.EOF || err == io.ErrUnexpectedEOF ||
-			err == io.ErrNoProgress || err == io.ErrClosedPipe || err == io.ErrShortBuffer ||
-			err == syscall.EBADF ||
-			strings.Contains(err.Error(), "use of closed file") {
-			break
-		}
+				// Immediately retry for temporary network errors
+				if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
+					continue
+				}
 
-		// Sleep briefly and try again
-		time.Sleep(time.Millisecond * time.Duration(5))
+				// Immediately retry for EAGAIN
+				if err == syscall.EAGAIN {
+					continue
+				}
+
+				// Immediately break for known unrecoverable errors
+				if err == io.EOF || err == io.ErrUnexpectedEOF ||
+					err == io.ErrNoProgress || err == io.ErrClosedPipe || err == io.ErrShortBuffer ||
+					err == syscall.EBADF ||
+					strings.Contains(err.Error(), "use of closed file") {
+					break
+				}
+
+				// Sleep briefly and try again
+				time.Sleep(time.Millisecond * time.Duration(5))
+			}
+		}(packetSource)
 	}
+
+	// Wait for all readers to exit so that packets chan doesn't close before that
+	waitOnDevices.Wait()
 }
 
 // SendTo sends a packet to the specified ip address
@@ -323,7 +391,9 @@ func (tc *TransportChannel) SendToPath(packetData []byte, path Path) error {
 // Close cleans up resources for the transport channel instance
 func (tc *TransportChannel) Close() {
 	syscall.Close(tc.socketFD)
-	tc.handle.Close()
+	for _, handle := range tc.handles {
+		handle.Close()
+	}
 }
 
 // FindLocalIP finds the IP of the interface device of the TransportChannel instance
@@ -336,13 +406,13 @@ func (tc *TransportChannel) FindLocalIP() (net.IP, error) {
 	var eth0Device pcap.Interface
 	deviceFound := false
 	for _, device := range devices {
-		if device.Name == tc.deviceName {
+		if device.Name == tc.deviceNames[0] {
 			deviceFound = true
 			eth0Device = device
 		}
 	}
 	if !deviceFound {
-		errMsg := fmt.Sprintf("Couldn't find a device named %s, or it did not have any addresses assigned to it", tc.deviceName)
+		errMsg := fmt.Sprintf("Couldn't find a device named %s, or it did not have any addresses assigned to it", tc.deviceNames)
 		return nil, errors.New(errMsg)
 	}
 
@@ -351,7 +421,7 @@ func (tc *TransportChannel) FindLocalIP() (net.IP, error) {
 
 // Interface returns the interface the TransportChannel is listening on
 func (tc *TransportChannel) Interface() string {
-	return tc.deviceName
+	return tc.deviceNames[0]
 }
 
 // Filter returns the BPF the TransportChannel uses

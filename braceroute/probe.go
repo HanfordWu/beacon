@@ -6,8 +6,8 @@ import (
 	"net"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/trstruth/beacon"
+	"github.com/spf13/cobra"
 )
 
 var dest string
@@ -80,7 +80,7 @@ func probeRun(cmd *cobra.Command, args []string) error {
 	)
 
 	if err != nil {
-		return fmt.Errorf("Failed to create new TransportChannel: %s", err)
+		return fmt.Errorf("Failed to create new TransportChannel on interface %s: %s", interfaceDevice, err)
 	}
 	fmt.Printf("filtering packets using bpf filter: %s\n", tc.GetFilter())
 

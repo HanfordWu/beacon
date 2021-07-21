@@ -3,11 +3,10 @@ module github.com/trstruth/beacon
 go 1.13
 
 require (
-	github.com/google/gopacket v1.1.17
-	github.com/google/uuid v1.1.1
-	github.com/olekukonko/tablewriter v0.0.4
-	github.com/spf13/cobra v0.0.6
-	github.com/spf13/pflag v1.0.5 // indirect
-	golang.org/x/net v0.0.0-20190522155817-f3200d17e092
-	golang.org/x/sys v0.0.0-20200302150141-5c8b2ff67527 // indirect
+	github.com/google/gopacket v1.1.19
+	github.com/google/uuid v1.2.0
+	github.com/olekukonko/tablewriter v0.0.5
+	github.com/sirupsen/logrus v1.8.0
+	github.com/spf13/cobra v1.1.3
+	golang.org/x/sys v0.0.0-20191026070338-33540a1f6037
 )
