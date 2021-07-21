@@ -9,11 +9,11 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
-	"syscall"
 )
 
 // TransportChannel is a struct which facilitates packet tx/rx
@@ -57,7 +57,7 @@ func WithInterface(device string) TransportChannelOption {
 		if device == "bsdany" {
 			out, err := exec.Command("/usr/sbin/cli", "-c", "show isis adjacency").Output()
 			if err != nil {
-				return fmt.Errorf("Listening on bsdany: failed to show interfaces: %s")
+				return fmt.Errorf("Listening on bsdany: failed to show interfaces: %v", err)
 			}
 			lines := strings.Split(string(out), "\n")[1:]
 			tc.deviceNames = []string{}
@@ -138,8 +138,7 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 	}
 
 	for _, opt := range options {
-		err := opt(tc)
-		if err != nil {
+		if err := opt(tc); err != nil {
 			return nil, fmt.Errorf("Failed to apply TransportChannelOption: %v", err)
 		}
 	}
