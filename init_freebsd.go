@@ -1,9 +1,10 @@
 package beacon
 
 import (
+	"log/syslog"
+
 	"github.com/sirupsen/logrus"
 	lSyslog "github.com/sirupsen/logrus/hooks/syslog"
-	"log/syslog"
 )
 
 var log = logrus.New()
