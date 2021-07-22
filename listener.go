@@ -5,10 +5,6 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/uuid"
-
-	"github.com/sirupsen/logrus"
-	lSyslog "github.com/sirupsen/logrus/hooks/syslog"
-	"log/syslog"
 )
 
 // PacketFilter represents a criteria that a packet can be said to meet.
@@ -21,8 +17,6 @@ type Listener struct {
 	matchChan  chan gopacket.Packet
 	persistent bool
 }
-
-var log = logrus.New()
 
 // NewListener return a new listener with the given criteria,
 // a newly generated uuid and an initialized match channel.
@@ -57,16 +51,6 @@ type ListenerMap struct {
 
 // NewListenerMap returns a new ListenerMap and initializes the appropriate fields.
 func NewListenerMap() *ListenerMap {
-	// Send all logs of severity debug and higher to syslog, which is all of them
-	// Set to LOG_INFO to exclude debug logs
-	var hook, err = lSyslog.NewSyslogHook("", "", syslog.LOG_INFO, "")
-	if err == nil {
-		log.Printf("Adding syslog hook")
-		log.Hooks.Add(hook)
-	} else {
-		log.Printf("Error getting syslog hook: %s", err)
-	}
-
 	return &ListenerMap{
 		m: make(map[uuid.UUID]*Listener),
 	}
