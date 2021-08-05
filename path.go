@@ -209,14 +209,19 @@ func (tc *TransportChannel) GetPathChannelTo(destIP, sourceIP net.IP, timeout in
 		// wait for listener to be ready to recv
 		defer close(pathChan)
 		buf := gopacket.NewSerializeBuffer()
-
+		ports := tc.newTraceroutePortPair()
 		var ttl uint8
+		trcrtString := "traceroute"
+		var sb strings.Builder
+		// using packet length as a unique key for each packet within a single traceroute
 		for ttl = 1; ttl <= 32; ttl++ {
+
+			sb.WriteByte(trcrtString[(ttl-1)%uint8(len(trcrtString))])
+
 			packetChan := make(chan gopacket.Packet, 1)
 			go handleTracerouteReturn(packetChan)
 
-			ports := tc.newTraceroutePortPair()
-			err := buildUDPTraceroutePacket(finalSourceIP, destIP, ports.src, ports.dst, ttl, []byte("traceroute"), buf)
+			err := buildUDPTraceroutePacket(finalSourceIP, destIP, ports.src, ports.dst, ttl, []byte(sb.String()), buf)
 			if err != nil {
 				log.Printf("Failed to build udp tracert packet: %s\n", err)
 			}
