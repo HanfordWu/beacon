@@ -185,27 +185,17 @@ func NewTransportChannel(options ...TransportChannelOption) (*TransportChannel, 
 		tc.packetSources[idx] = CreatePacketSource(handle)
 	}
 
-	// open a raw socket
-	// http://man7.org/linux/man-pages/man7/raw.7.html
-	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
+	_, err := tc.setupSocket("IPv4")
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create IPv4 socket for TransportChannel: %s", err)
 	}
-	// IPPROTO_RAW protocol implies IP_HDRINCL on linux, however on freebsd we must set it explicitly
-	// so that no IP header is automatically appended to the IP packets we craft
-	// https://www.freebsd.org/cgi/man.cgi?query=ip&sektion=4&manpath=FreeBSD+12.0-RELEASE
-	if err := syscall.SetsockoptInt(fd, syscall.IPPROTO_IP, syscall.IP_HDRINCL, 1); err != nil {
-		return nil, fmt.Errorf("Failed to set v4 IPHeader to not include additional IP header: %s", err)
-	}
-	tc.socketFD = fd
 	tc.socketFailureMsgQueue = make(chan int)
 	go tc.renewSocketFD()
 
-	fd6, err := syscall.Socket(syscall.AF_INET6, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
+	_, err = tc.setupSocket("IPv6")
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create IPv6 socket for TransportChannel: %s", err)
 	}
-	tc.socket6FD = fd6
 	tc.socket6FailureMsgQueue = make(chan int)
 	go tc.renewSocket6FD()
 
@@ -233,42 +223,68 @@ func NewBoomerangTransportChannel(options ...TransportChannelOption) (*Transport
 	return NewTransportChannel(options...)
 }
 
-func (tc *TransportChannel) renewSocketFD() error {
+func (tc *TransportChannel) setupSocket(socketType string) (int, error) {
+	if socketType == "IPv4" {
+		// open a raw socket
+		// http://man7.org/linux/man-pages/man7/raw.7.html
+		fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
+		if err != nil {
+			return fd, fmt.Errorf("Failed to create v4 socket: %s", err)
+		}
+		// IPPROTO_RAW protocol implies IP_HDRINCL on linux, however on freebsd we must set it explicitly
+		// so that no IP header is automatically appended to the IP packets we craft
+		// https://www.freebsd.org/cgi/man.cgi?query=ip&sektion=4&manpath=FreeBSD+12.0-RELEASE
+		if err := syscall.SetsockoptInt(fd, syscall.IPPROTO_IP, syscall.IP_HDRINCL, 1); err != nil {
+			return fd, fmt.Errorf("Failed to set v4 socket option: %s", err)
+		}
+		tc.socketFD = fd
+		return fd, nil
+
+	} else if socketType == "IPv6" {
+		fd6, err := syscall.Socket(syscall.AF_INET6, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
+		if err != nil {
+			return fd6, fmt.Errorf("Failed to create v6 socket: %s", err)
+		}
+		tc.socket6FD = fd6
+		return fd6, nil
+	}
+
+	return -1, fmt.Errorf("Failed to create socket: unrecognized socket type")
+}
+
+func (tc *TransportChannel) renewSocketFD() {
 	for {
 		brokenFD := <-tc.socketFailureMsgQueue
 		if brokenFD != tc.socketFD {
 			continue
 		}
 		log.Println("Renewing SocketFD")
-		fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
+		fd, err := tc.setupSocket("IPv4")
 		if err != nil {
-			log.Printf("Failed to create IPv4 socket for TransportChannel: %s", err)
+			log.Printf("Failed to renew v4 socket FD: %s", err)
 		}
-		tc.socketFD = fd
 		if brokenFD != fd {
 			syscall.Close(brokenFD)
 		}
 	}
-	return nil
 }
 
-func (tc *TransportChannel) renewSocket6FD() error {
+func (tc *TransportChannel) renewSocket6FD() {
 	for {
 		broken6FD := <-tc.socket6FailureMsgQueue
 		if broken6FD != tc.socket6FD {
 			continue
 		}
 		log.Println("Renewing socket6FD")
-		fd6, err := syscall.Socket(syscall.AF_INET6, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
+		fd6, err := tc.setupSocket("IPv6")
 		if err != nil {
-			log.Printf("Failed to create IPv6 socket for TransportChannel: %s", err)
+			log.Printf("Failed to renew v6 socket FD: %s", err)
 		}
 		tc.socket6FD = fd6
 		if broken6FD != fd6 {
 			syscall.Close(broken6FD)
 		}
 	}
-	return nil
 }
 
 // Stats displays the stats exposed by the underlying packet handle of a TransportChannel.
